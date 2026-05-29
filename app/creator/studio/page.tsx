@@ -45,7 +45,7 @@ export default function CreatorStudio() {
   const [storefrontUrl, setStorefrontUrl] = useState('');
 
   const product = PRODUCT_TYPES.find(p => p.id === productType);
-  const creatorEarnings = (price * 0.05).toFixed(2);
+  const creatorEarnings = (price * 0.10).toFixed(2);
   const schoolDonation  = (price * 0.10).toFixed(2);
   const maxPhotos = productType === 'portrait_print' ? 1 : 9;
 
@@ -386,9 +386,9 @@ export default function CreatorStudio() {
                 padding: '14px 16px',
               }}>
                 {[
-                  ['Your earnings (5%)', `$${creatorEarnings} per order`],
+                  ['Your earnings (10%)', `$${creatorEarnings} per order`],
                   ['School donation (10%)', `$${schoolDonation} per order`],
-                  ['Un Momento fulfills', `$${(price * 0.85).toFixed(2)}`],
+                  ['Un Momento fulfills', `$${(price * 0.80).toFixed(2)}`],
                 ].map(([k, v]) => (
                   <div key={k} style={{
                     display: 'flex', justifyContent: 'space-between',

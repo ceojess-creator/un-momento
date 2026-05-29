@@ -121,7 +121,7 @@ export async function POST(request: Request) {
         layout_template: layout,
         price,
         base_cost:      baseCost,
-        creator_pct:    0.05,
+        creator_pct:    0.10,
         is_active:      true,
       })
       .select('id')

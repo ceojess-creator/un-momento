@@ -68,9 +68,7 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
   const [shape,       setShape]       = useState('rounded_square');
   const [activeSlot,  setActiveSlot]  = useState(0);
   const [removingBg,  setRemovingBg]  = useState(false);
-  const [activePanel, setActivePanel] = useState
-    'photo' | 'text' | 'overlays' | 'layout'
-  >('photo');
+  const [activePanel, setActivePanel] = useState<'photo' | 'text' | 'overlays' | 'layout'>('photo');
 
   const selectedLayout = LAYOUTS.find(l => l.id === layout)!;
   const slotCount      = selectedLayout.cols * selectedLayout.rows;

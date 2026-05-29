@@ -42,11 +42,11 @@ export default function Home() {
                     fontSize: 15 }}>
           Book an event
         </a>
-        <a href="mailto:ceojess@unmomentoprints.com"
+        <a href="/event/grad-2026"
            style={{ padding: '14px 28px', border: '1px solid #444', color: '#ffffff',
                     borderRadius: 8, textDecoration: 'none', fontWeight: 500,
                     fontSize: 15 }}>
-          PTSO fundraiser inquiry
+          Order now →
         </a>
       </div>
 

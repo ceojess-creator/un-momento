@@ -126,7 +126,7 @@ export default function CreatorStudio() {
           <p style={{ color: '#888', fontSize: 14, lineHeight: 1.7,
                       margin: '0 0 24px' }}>
             Share your link with family and friends.
-            You earn 5% of every order. 10% goes to your school.
+            You earn 10% of every order. 10% goes to your school.
           </p>
           <div style={{
             background: '#111', borderRadius: 10, padding: '14px 16px',
@@ -477,7 +477,7 @@ export default function CreatorStudio() {
                 ['Product', product?.name || ''],
                 ['Photos', `${photos.length} uploaded`],
                 ['Your price', `$${price}`],
-                ['Your earnings', `$${creatorEarnings} per order (5%)`],
+                ['Your earnings', `$${creatorEarnings} per order (10%)`],
                 ['School donation', `$${schoolDonation} per order (10%)`],
                 ['Storefront', handle ? `unmomentoprints.com/${handle}` : '—'],
               ].map(([k, v]) => (

@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     }
 
     // Create the product
-    const baseCost = price * 0.85;  // 15% platform fee
+    const baseCost = price * 0.80;  // 20% platform fee
 
     const { data: product, error } = await supabase
       .from('creator_products')

@@ -34,19 +34,20 @@ export default function Home() {
       </p>
 
       {/* CTA buttons */}
+      {/* CTA buttons */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
                     justifyContent: 'center', marginBottom: 48 }}>
-        <a href="mailto:ceojess@unmomentoprints.com"
+        <a href="/event/grad-2026"
            style={{ padding: '14px 28px', background: '#ffffff', color: '#0a0a0a',
                     borderRadius: 8, textDecoration: 'none', fontWeight: 600,
                     fontSize: 15 }}>
-          Book an event
+          Order now →
         </a>
-        <a href="/event/grad-2026"
+        <a href="mailto:ceojess@unmomentoprints.com"
            style={{ padding: '14px 28px', border: '1px solid #444', color: '#ffffff',
                     borderRadius: 8, textDecoration: 'none', fontWeight: 500,
                     fontSize: 15 }}>
-          Order now →
+          Book an event
         </a>
       </div>
 

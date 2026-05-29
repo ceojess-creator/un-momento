@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const SHEET_W = 600;
-const SHEET_H = 700;
+const SHEET_H = 1050;  // 4×7 ratio: 600 × 1.75 = 1050
 
 const LAYOUTS = [
   { id: '1x1',   label: '1 large',    cols: 1, rows: 1 },

@@ -38,7 +38,7 @@ const ADDON_NAMES: Record<string, string> = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { bundle_id, addons = [], form, event_slug } = body;
+    const { bundle_id, addons = [], form, event_slug, referral_code } = body;
 
     if (!bundle_id || !BUNDLE_PRICES[bundle_id]) {
       return NextResponse.json(
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         grad_name:    form.grad_name || '',
         school:       form.school || '',
         grad_date:    form.grad_date || '',
-        notes:        form.notes || '',
+        referral_code: referral_code || '',
       },
     });
 

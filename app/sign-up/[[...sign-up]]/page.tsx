@@ -26,8 +26,6 @@ export default function SignUpPage() {
               borderRadius:         '8px',
             }
           }}
-          afterSignUpUrl="/account"
-          redirectUrl="/account"
         />
       </div>
     </main>

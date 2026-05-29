@@ -16,19 +16,17 @@ export default function SignInPage() {
           Un Momento Prints
         </p>
         <SignIn
-          appearance={{
-            variables: {
-              colorBackground:    '#111',
-              colorText:          '#ffffff',
-              colorPrimary:       '#4ADE80',
-              colorInputBackground: '#1a1a1a',
-              colorInputText:     '#ffffff',
-              borderRadius:       '8px',
-            }
-          }}
-          afterSignInUrl="/account"
-          redirectUrl="/account"
-        />
+  appearance={{
+    variables: {
+      colorBackground:    '#111',
+      colorText:          '#ffffff',
+      colorPrimary:       '#4ADE80',
+      colorInputBackground: '#1a1a1a',
+      colorInputText:     '#ffffff',
+      borderRadius:       '8px',
+    }
+  }}
+/>
       </div>
     </main>
   );

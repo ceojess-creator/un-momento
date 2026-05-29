@@ -186,7 +186,7 @@ export default function CreatorStudio() {
             Creator Studio
           </h1>
           <p style={{ color: '#888', fontSize: 13, margin: 0 }}>
-            Build your product. Share your storefront. Earn 5% of every sale.
+            Build your product. Share your storefront. Earn 10% of every sale.
           </p>
         </div>
 

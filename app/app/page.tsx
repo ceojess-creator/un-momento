@@ -30,7 +30,7 @@ export default function Home() {
         and events across California and Wisconsin.
       </p>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
+<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
                     justifyContent: 'center', marginBottom: 48 }}>
         <a href="/event/grad-2026"
            style={{ padding: '14px 28px', background: '#ffffff', color: '#0a0a0a',

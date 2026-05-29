@@ -682,3 +682,4 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
     </div>
   );
 }
+

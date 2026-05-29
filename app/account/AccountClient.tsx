@@ -72,7 +72,7 @@ export default function AccountClient({
             {account.name}
           </h1>
         </div>
-        <UserButton afterSignOutUrl="/" />
+        <UserButton />
       </div>
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 16px' }}>

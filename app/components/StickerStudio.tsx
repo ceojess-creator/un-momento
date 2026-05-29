@@ -105,7 +105,7 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
       .forEach((o: any) => fc.remove(o));
 
     const l      = LAYOUTS.find(x => x.id === layoutId)!;
-    const MARGIN = 30;
+    const MARGIN = 60;
     const GUTTER = 10;
     const slotW  = (SHEET_W - MARGIN * 2 - GUTTER * (l.cols - 1)) / l.cols;
     const slotH  = (SHEET_H - MARGIN * 2 - GUTTER * (l.rows - 1)) / l.rows;
@@ -148,7 +148,7 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
     }
 
     // Registration marks
-    [[8, 8], [SHEET_W - 26, 8], [8, SHEET_H - 26]].forEach(([rx, ry]) => {
+    [[20, 20], [SHEET_W - 40, 20], [20, SHEET_H - 40]].forEach(([rx, ry]) => {
       const mark = new f.Rect({
         left:       rx,
         top:        ry,

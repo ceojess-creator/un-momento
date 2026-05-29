@@ -80,9 +80,7 @@ export default function SmartEditor({
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState
-    'photo' | 'filter' | 'text' | 'qr' | 'sticker'
-  >('photo');
+  const [activeTab, setActiveTab] = useState<'photo' | 'filter' | 'text' | 'qr' | 'sticker'>('photo');
 
   const [photoFile, setPhotoFile]   = useState<File | null>(null);
   const [state, setState]           = useState<EditorState>({

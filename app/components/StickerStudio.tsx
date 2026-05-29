@@ -1,8 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
-
-// Fabric.js loaded dynamically to avoid SSR issues
-let fabric: any = null;
+import { useEffect, useRef, useState } from 'react';
 
 const SHEET_W = 600;
 const SHEET_H = 700;
@@ -44,122 +41,123 @@ const TEXT_SUGGESTIONS = [
   'The best is yet to come', 'Level up', 'Next chapter',
 ];
 
+const MORE_EMOJIS = [
+  '🎉','🎊','💫','🌸','🦋','🙌','👑','🎵',
+  '🌈','☀️','🌙','⚡','🎯','🏅','📸','🖼️',
+];
+
 interface StickerStudioProps {
   onComplete: (dataUrl: string, layout: string, shape: string) => void;
   onBack:     () => void;
 }
 
 export default function StickerStudio({ onComplete, onBack }: StickerStudioProps) {
-  const canvasRef      = useRef<HTMLCanvasElement>(null);
-  const fabricRef      = useRef<any>(null);
-  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const fabricRef     = useRef<any>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const fabricMod     = useRef<any>(null);
 
-  const [layout,       setLayout]      = useState('2x2');
-  const [shape,        setShape]       = useState('rounded_square');
-  const [activePanel,  setActivePanel] = useState<'photo'|'text'|'overlays'|'layout'>('photo');
-  const [removingBg,   setRemovingBg]  = useState(false);
-  const [selectedObj,  setSelectedObj] = useState<any>(null);
-  const [overlapWarn,  setOverlapWarn] = useState<string | null>(null);
-  const [textInput,    setTextInput]   = useState('');
-  const [textFont,     setTextFont]    = useState('Arial');
-  const [textColor,    setTextColor]   = useState('#ffffff');
-  const [textSize,     setTextSize]    = useState(24);
-  const [fabricLoaded, setFabricLoaded] = useState(false);
-
-  // Load Fabric.js dynamically
-  useEffect(() => {
-    import('fabric').then(f => {
-      fabric = f;
-      setFabricLoaded(true);
-    });
-  }, []);
+  const [layout,      setLayout]      = useState('2x2');
+  const [shape,       setShape]       = useState('rounded_square');
+  const [activePanel, setActivePanel] = useState<'photo'|'text'|'overlays'|'layout'>('photo');
+  const [removingBg,  setRemovingBg]  = useState(false);
+  const [selectedObj, setSelectedObj] = useState<any>(null);
+  const [overlapWarn, setOverlapWarn] = useState<string | null>(null);
+  const [textInput,   setTextInput]   = useState('');
+  const [textFont,    setTextFont]    = useState('Arial');
+  const [textColor,   setTextColor]   = useState('#ffffff');
+  const [textSize,    setTextSize]    = useState(24);
+  const [ready,       setReady]       = useState(false);
 
   // Initialize Fabric canvas
   useEffect(() => {
-    if (!fabricLoaded || !canvasRef.current) return;
+    let fc: any = null;
 
-    const fc = new fabric.Canvas(canvasRef.current, {
-      width:           SHEET_W,
-      height:          SHEET_H,
-      backgroundColor: '#ffffff',
-      selection:       true,
+    import('fabric').then((f) => {
+      fabricMod.current = f;
+
+      if (!canvasRef.current) return;
+
+      fc = new f.Canvas(canvasRef.current, {
+        width:           SHEET_W,
+        height:          SHEET_H,
+        backgroundColor: '#ffffff',
+      });
+
+      fabricRef.current = fc;
+      drawGuides(fc, layout, f);
+      setReady(true);
+
+      fc.on('selection:created', (e: any) => setSelectedObj(e.selected?.[0] ?? null));
+      fc.on('selection:updated', (e: any) => setSelectedObj(e.selected?.[0] ?? null));
+      fc.on('selection:cleared', ()       => setSelectedObj(null));
+      fc.on('object:moving',     ()       => detectOverlaps(fc));
+      fc.on('object:moved',      ()       => detectOverlaps(fc));
     });
 
-    fabricRef.current = fc;
+    return () => { try { fc?.dispose(); } catch {} };
+  }, []);
 
-    // Draw layout grid guides
-    drawLayoutGuides(fc, layout);
+  function drawGuides(fc: any, layoutId: string, f: any) {
+    // Remove old guides
+    fc.getObjects()
+      .filter((o: any) => o.customData?.guide)
+      .forEach((o: any) => fc.remove(o));
 
-    // Selection events
-    fc.on('selection:created',  (e: any) => setSelectedObj(e.selected?.[0]));
-    fc.on('selection:updated',  (e: any) => setSelectedObj(e.selected?.[0]));
-    fc.on('selection:cleared',  ()       => setSelectedObj(null));
-
-    // Overlap detection on object move
-    fc.on('object:moving', () => checkOverlaps(fc));
-    fc.on('object:moved',  () => checkOverlaps(fc));
-
-    return () => fc.dispose();
-  }, [fabricLoaded, layout]);
-
-  function drawLayoutGuides(fc: any, layoutId: string) {
-    // Remove existing guides
-    const guides = fc.getObjects().filter((o: any) => o.data?.type === 'guide');
-    guides.forEach((g: any) => fc.remove(g));
-
-    const l       = LAYOUTS.find(x => x.id === layoutId)!;
-    const MARGIN  = 30;
-    const GUTTER  = 10;
-    const slotW   = (SHEET_W - MARGIN * 2 - GUTTER * (l.cols - 1)) / l.cols;
-    const slotH   = (SHEET_H - MARGIN * 2 - GUTTER * (l.rows - 1)) / l.rows;
+    const l      = LAYOUTS.find(x => x.id === layoutId)!;
+    const MARGIN = 30;
+    const GUTTER = 10;
+    const slotW  = (SHEET_W - MARGIN * 2 - GUTTER * (l.cols - 1)) / l.cols;
+    const slotH  = (SHEET_H - MARGIN * 2 - GUTTER * (l.rows - 1)) / l.rows;
 
     for (let r = 0; r < l.rows; r++) {
       for (let c = 0; c < l.cols; c++) {
-        const x = MARGIN + c * (slotW + GUTTER);
-        const y = MARGIN + r * (slotH + GUTTER);
+        const x   = MARGIN + c * (slotW + GUTTER);
+        const y   = MARGIN + r * (slotH + GUTTER);
+        const idx = r * l.cols + c;
 
-        // Slot boundary (dashed)
-        const rect = new fabric.Rect({
-          left:         x,
-          top:          y,
-          width:        slotW,
-          height:       slotH,
-          fill:         'rgba(240,240,240,0.3)',
-          stroke:       '#FF0080',
-          strokeWidth:  1,
-          strokeDashArray: [4, 4],
-          selectable:   false,
-          evented:      false,
-          data:         { type: 'guide', slot: r * l.cols + c },
+        const rect = new f.Rect({
+          left:            x,
+          top:             y,
+          width:           slotW,
+          height:          slotH,
+          fill:            'rgba(230,255,230,0.15)',
+          stroke:          '#FF0080',
+          strokeWidth:     1.5,
+          strokeDashArray: [5, 5],
+          selectable:      false,
+          evented:         false,
+          customData:      { guide: true },
         });
-        fc.add(rect);
 
-        // Slot number label
-        const label = new fabric.Text(`${r * l.cols + c + 1}`, {
-          left:         x + slotW / 2,
-          top:          y + slotH / 2,
-          fontSize:     20,
-          fill:         '#ccc',
-          textAlign:    'center',
-          originX:      'center',
-          originY:      'center',
-          selectable:   false,
-          evented:      false,
-          data:         { type: 'guide' },
+        const label = new f.FabricText(`${idx + 1}`, {
+          left:       x + slotW / 2,
+          top:        y + slotH / 2,
+          fontSize:   28,
+          fill:       '#cccccc',
+          textAlign:  'center',
+          originX:    'center',
+          originY:    'center',
+          selectable: false,
+          evented:    false,
+          customData: { guide: true },
         });
-        fc.add(label);
+
+        fc.add(rect, label);
       }
     }
 
     // Registration marks
-    [[8,8],[SHEET_W-26,8],[8,SHEET_H-26]].forEach(([rx,ry]) => {
-      const mark = new fabric.Rect({
-        left:       rx, top: ry,
-        width:      18, height: 18,
-        fill:       '#000',
+    [[8, 8], [SHEET_W - 26, 8], [8, SHEET_H - 26]].forEach(([rx, ry]) => {
+      const mark = new f.Rect({
+        left:       rx,
+        top:        ry,
+        width:      18,
+        height:     18,
+        fill:       '#000000',
         selectable: false,
         evented:    false,
-        data:       { type: 'guide' },
+        customData: { guide: true },
       });
       fc.add(mark);
     });
@@ -167,111 +165,102 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
     fc.renderAll();
   }
 
-  // Overlap detection with warning
-  function checkOverlaps(fc: any) {
-    const objects = fc.getObjects().filter((o: any) => !o.data?.type);
-    let warned    = false;
+  function detectOverlaps(fc: any) {
+    const objs = fc.getObjects().filter((o: any) => !o.customData?.guide);
+    let warned = false;
 
-    for (let i = 0; i < objects.length; i++) {
-      for (let j = i + 1; j < objects.length; j++) {
-        const a = objects[i];
-        const b = objects[j];
-
+    for (let i = 0; i < objs.length && !warned; i++) {
+      for (let j = i + 1; j < objs.length && !warned; j++) {
+        const a = objs[i];
+        const b = objs[j];
         if (!a.intersectsWithObject(b)) continue;
 
-        // Calculate overlap area
-        const aBounds = a.getBoundingRect();
-        const bBounds = b.getBoundingRect();
+        const ab = a.getBoundingRect();
+        const bb = b.getBoundingRect();
+        const ox = Math.max(0,
+          Math.min(ab.left + ab.width,  bb.left + bb.width) -
+          Math.max(ab.left, bb.left));
+        const oy = Math.max(0,
+          Math.min(ab.top  + ab.height, bb.top  + bb.height) -
+          Math.max(ab.top,  bb.top));
+        const overlap = ox * oy;
+        const aArea   = ab.width * ab.height;
+        const bArea   = bb.width * bb.height;
 
-        const overlapX = Math.max(0,
-          Math.min(aBounds.left + aBounds.width,  bBounds.left + bBounds.width) -
-          Math.max(aBounds.left, bBounds.left)
-        );
-        const overlapY = Math.max(0,
-          Math.min(aBounds.top  + aBounds.height, bBounds.top  + bBounds.height) -
-          Math.max(aBounds.top,  bBounds.top)
-        );
-        const overlapArea = overlapX * overlapY;
-        const aArea       = aBounds.width * aBounds.height;
-        const bArea       = bBounds.width * bBounds.height;
-
-        // Warn if overlap > 30% of either object
-        if (overlapArea / aArea > 0.30 || overlapArea / bArea > 0.30) {
-          const aName = a.data?.label || a.type;
-          const bName = b.data?.label || b.type;
+        if (overlap / aArea > 0.3 || overlap / bArea > 0.3) {
+          const aName = a.customData?.label || a.type;
+          const bName = b.customData?.label || b.type;
           setOverlapWarn(
             `⚠️ "${aName}" is covering "${bName}" by more than 30%. ` +
-            `The die-cut will follow the outer edge of both — is that what you want?`
+            `The die-cut will follow the outer edge of both. Is that what you want?`
           );
           warned = true;
-          break;
         }
       }
-      if (warned) break;
     }
-
     if (!warned) setOverlapWarn(null);
   }
 
-  // Add photo to canvas
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !fabricRef.current) return;
+    if (!file || !fabricRef.current || !fabricMod.current) return;
 
+    const f   = fabricMod.current;
     const url = URL.createObjectURL(file);
-    fabric.Image.fromURL(url, (img: any) => {
-      // Scale to fit a slot
-      const l      = LAYOUTS.find(x => x.id === layout)!;
-      const MARGIN = 30;
-      const GUTTER = 10;
-      const slotW  = (SHEET_W - MARGIN * 2 - GUTTER * (l.cols - 1)) / l.cols;
-      const slotH  = (SHEET_H - MARGIN * 2 - GUTTER * (l.rows - 1)) / l.rows;
 
-      const scale = Math.min(slotW / img.width!, slotH / img.height!);
-      img.scale(scale);
-      img.set({
-        left: MARGIN + 10,
-        top:  MARGIN + 10,
-        data: { type: 'photo', label: 'photo', file },
-      });
-      fabricRef.current.add(img);
-      fabricRef.current.setActiveObject(img);
-      fabricRef.current.renderAll();
+    const img = await f.FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
+
+    const l      = LAYOUTS.find(x => x.id === layout)!;
+    const MARGIN = 30;
+    const GUTTER = 10;
+    const slotW  = (SHEET_W - MARGIN * 2 - GUTTER * (l.cols - 1)) / l.cols;
+    const slotH  = (SHEET_H - MARGIN * 2 - GUTTER * (l.rows - 1)) / l.rows;
+    const scale  = Math.min(slotW / img.width!, slotH / img.height!) * 0.9;
+
+    img.set({
+      left:       MARGIN + 10,
+      top:        MARGIN + 10,
+      scaleX:     scale,
+      scaleY:     scale,
+      customData: { label: 'photo', file },
     });
+
+    fabricRef.current.add(img);
+    fabricRef.current.setActiveObject(img);
+    fabricRef.current.renderAll();
+
+    // Reset file input so same file can be re-uploaded
+    e.target.value = '';
   }
 
-  // Remove background via API
   async function removeBackground() {
     const active = fabricRef.current?.getActiveObject();
-    if (!active || active.data?.type !== 'photo') {
-      alert('Select a photo first');
+    if (!active || !active.customData?.file) {
+      alert('Select a photo on the canvas first, then tap Remove Background.');
       return;
     }
     setRemovingBg(true);
-
     try {
-      const file = active.data.file as File;
-      const fd   = new FormData();
-      fd.append('image', file);
-
+      const fd = new FormData();
+      fd.append('image', active.customData.file as File);
       const res  = await fetch('/api/remove-bg', { method: 'POST', body: fd });
       const data = await res.json();
 
-      if (data.url) {
-        fabric.Image.fromURL(data.url, (newImg: any) => {
-          newImg.set({
-            left:    active.left,
-            top:     active.top,
-            scaleX:  active.scaleX,
-            scaleY:  active.scaleY,
-            angle:   active.angle,
-            data:    { type: 'cutout', label: 'cutout' },
-          });
-          fabricRef.current.remove(active);
-          fabricRef.current.add(newImg);
-          fabricRef.current.setActiveObject(newImg);
-          fabricRef.current.renderAll();
+      if (data.url && fabricMod.current) {
+        const f   = fabricMod.current;
+        const img = await f.FabricImage.fromURL(data.url, { crossOrigin: 'anonymous' });
+        img.set({
+          left:       active.left,
+          top:        active.top,
+          scaleX:     active.scaleX,
+          scaleY:     active.scaleY,
+          angle:      active.angle,
+          customData: { label: 'cutout' },
         });
+        fabricRef.current.remove(active);
+        fabricRef.current.add(img);
+        fabricRef.current.setActiveObject(img);
+        fabricRef.current.renderAll();
       }
     } catch (err) {
       console.error('BG removal failed:', err);
@@ -279,18 +268,18 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
     setRemovingBg(false);
   }
 
-  // Add text
   function addText() {
-    if (!textInput || !fabricRef.current) return;
-    const text = new fabric.Text(textInput, {
-      left:     SHEET_W / 2,
-      top:      SHEET_H / 2,
-      fontSize: textSize,
+    if (!textInput || !fabricRef.current || !fabricMod.current) return;
+    const f    = fabricMod.current;
+    const text = new f.FabricText(textInput, {
+      left:       SHEET_W / 2,
+      top:        SHEET_H / 2,
+      fontSize:   textSize,
       fontFamily: textFont,
-      fill:     textColor,
-      originX:  'center',
-      originY:  'center',
-      data:     { type: 'text', label: `text: "${textInput}"` },
+      fill:       textColor,
+      originX:    'center',
+      originY:    'center',
+      customData: { label: `"${textInput}"` },
     });
     fabricRef.current.add(text);
     fabricRef.current.setActiveObject(text);
@@ -298,74 +287,67 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
     setTextInput('');
   }
 
-  // Add emoji / clip art
   function addEmoji(emoji: string) {
-    if (!fabricRef.current) return;
-    const text = new fabric.Text(emoji, {
-      left:     SHEET_W / 2 + Math.random() * 60 - 30,
-      top:      SHEET_H / 2 + Math.random() * 60 - 30,
-      fontSize: 40,
-      originX:  'center',
-      originY:  'center',
-      data:     { type: 'emoji', label: emoji },
+    if (!fabricRef.current || !fabricMod.current) return;
+    const f    = fabricMod.current;
+    const text = new f.FabricText(emoji, {
+      left:       SHEET_W / 2 + (Math.random() * 60 - 30),
+      top:        SHEET_H / 2 + (Math.random() * 60 - 30),
+      fontSize:   44,
+      originX:    'center',
+      originY:    'center',
+      customData: { label: emoji },
     });
     fabricRef.current.add(text);
     fabricRef.current.setActiveObject(text);
     fabricRef.current.renderAll();
   }
 
-  // Delete selected object
   function deleteSelected() {
     const active = fabricRef.current?.getActiveObject();
-    if (!active || active.data?.type === 'guide') return;
+    if (!active || active.customData?.guide) return;
     fabricRef.current.remove(active);
     fabricRef.current.renderAll();
     setSelectedObj(null);
   }
 
-  // Bring forward / send back
   function bringForward() {
     const active = fabricRef.current?.getActiveObject();
     if (!active) return;
-    fabricRef.current.bringForward(active);
+    fabricRef.current.bringObjectForward(active);
     fabricRef.current.renderAll();
   }
 
   function sendBackward() {
     const active = fabricRef.current?.getActiveObject();
     if (!active) return;
-    fabricRef.current.sendBackwards(active);
+    fabricRef.current.sendObjectBackwards(active);
     fabricRef.current.renderAll();
   }
 
-  // Handle layout change
   function handleLayoutChange(newLayout: string) {
     setLayout(newLayout);
-    if (fabricRef.current) {
-      drawLayoutGuides(fabricRef.current, newLayout);
+    if (fabricRef.current && fabricMod.current) {
+      drawGuides(fabricRef.current, newLayout, fabricMod.current);
     }
   }
 
-  // Export final design
   function handleComplete() {
     if (!fabricRef.current) return;
-
-    // Hide guides for export
+    // Hide guides for clean export
     fabricRef.current.getObjects()
-      .filter((o: any) => o.data?.type === 'guide')
-      .forEach((o: any) => o.set({ visible: false }));
+      .filter((o: any) => o.customData?.guide)
+      .forEach((o: any) => { o.visible = false; });
+    fabricRef.current.renderAll();
 
-    const dataUrl = fabricRef.current.toDataURL({
-      format:     'png',
-      multiplier: 2,  // 2× for print quality
-    });
+    const dataUrl = fabricRef.current.toDataURL({ format: 'png', multiplier: 2 });
 
     // Restore guides
     fabricRef.current.getObjects()
-      .filter((o: any) => o.data?.type === 'guide')
-      .forEach((o: any) => o.set({ visible: true }));
-
+      .filter((o: any) => o.customData?.guide)
+      .forEach((o: any) => { o.visible = true; });
     fabricRef.current.renderAll();
+
     onComplete(dataUrl, layout, shape);
   }
 
@@ -377,21 +359,11 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
         border:     activePanel === id ? '1px solid #444' : '1px solid transparent',
         borderRadius: 8,
         color:      activePanel === id ? '#fff' : '#666',
-        fontSize:   11, cursor: 'pointer', fontWeight: 500,
-      }}
-    >
+        fontSize: 11, cursor: 'pointer', fontWeight: 500,
+      }}>
       {label}
     </button>
   );
-
-  if (!fabricLoaded) {
-    return (
-      <div style={{ textAlign: 'center', padding: '40px',
-                    color: '#888', fontSize: 14 }}>
-        Loading sticker studio…
-      </div>
-    );
-  }
 
   return (
     <div style={{ width: '100%', maxWidth: 640 }}>
@@ -401,8 +373,8 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
           Sticker sheet designer
         </h3>
         <p style={{ fontSize: 12, color: '#888', margin: 0 }}>
-          Drag elements freely. Pink dashed lines = die-cut area.
-          Black squares = registration marks for Pixcut accuracy.
+          Drag elements freely · Pink dashed = die-cut lines ·
+          Black squares = Pixcut registration marks
         </p>
       </div>
 
@@ -411,41 +383,52 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
         <div style={{
           background: '#2a1a00', border: '1px solid #BA7517',
           borderRadius: 8, padding: '8px 12px',
-          fontSize: 12, color: '#BA7517', marginBottom: 10,
-          lineHeight: 1.5,
+          fontSize: 12, color: '#BA7517',
+          marginBottom: 10, lineHeight: 1.5,
         }}>
           {overlapWarn}
           <button onClick={() => setOverlapWarn(null)}
             style={{
               marginLeft: 8, padding: '2px 8px',
               background: 'transparent', border: '1px solid #BA7517',
-              borderRadius: 4, color: '#BA7517', fontSize: 11,
-              cursor: 'pointer',
+              borderRadius: 4, color: '#BA7517',
+              fontSize: 11, cursor: 'pointer',
             }}>
             Got it
           </button>
         </div>
       )}
 
-      {/* Fabric canvas */}
+      {/* Canvas */}
+      {!ready && (
+        <div style={{
+          height: 300, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: '#888', fontSize: 14,
+          background: '#111', borderRadius: 10, marginBottom: 10,
+        }}>
+          Loading canvas…
+        </div>
+      )}
       <div style={{
         borderRadius: 10, overflow: 'hidden',
         border: '1px solid #333', marginBottom: 10,
         background: '#fff',
+        display: ready ? 'block' : 'none',
       }}>
-        <canvas ref={canvasRef} />
+        <canvas ref={canvasRef}
+          style={{ width: '100%', display: 'block' }} />
       </div>
 
-      {/* Selected object toolbar */}
-      {selectedObj && selectedObj.data?.type !== 'guide' && (
+      {/* Selected toolbar */}
+      {selectedObj && !selectedObj.customData?.guide && (
         <div style={{
           display: 'flex', gap: 6, marginBottom: 10,
           background: '#111', borderRadius: 8, padding: '8px',
           border: '1px solid #222',
         }}>
-          <span style={{ fontSize: 12, color: '#888', flex: 1,
-                         alignSelf: 'center' }}>
-            Selected: {selectedObj.data?.label || selectedObj.type}
+          <span style={{ fontSize: 12, color: '#888',
+                         flex: 1, alignSelf: 'center' }}>
+            {selectedObj.customData?.label || selectedObj.type}
           </span>
           <button onClick={bringForward}
             style={{ padding: '4px 8px', background: '#1a1a1a',
@@ -482,7 +465,6 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
         border: '1px solid #222', marginBottom: 10,
       }}>
 
-        {/* Photo panel */}
         {activePanel === 'photo' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button onClick={() => fileInputRef.current?.click()}
@@ -507,23 +489,20 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
               }}>
               {removingBg
                 ? '✨ Removing background…'
-                : '✨ Remove background (select a photo first)'}
+                : '✨ Remove background (select photo first)'}
             </button>
 
-            <p style={{ fontSize: 11, color: '#555', margin: 0,
-                        lineHeight: 1.5 }}>
-              After adding a photo, tap it to select it, then tap
-              "Remove background" to cut out the graduate.
-              Drag the cutout anywhere on the sheet.
+            <p style={{ fontSize: 11, color: '#555', margin: 0, lineHeight: 1.5 }}>
+              1. Add photo → 2. Tap it to select → 3. Remove background →
+              4. Drag the cutout anywhere on the sheet.
+              Repeat for each sticker slot.
             </p>
           </div>
         )}
 
-        {/* Text panel */}
         {activePanel === 'text' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-              value={textInput}
+            <input value={textInput}
               onChange={e => setTextInput(e.target.value)}
               placeholder="Type text to add…"
               onKeyDown={e => e.key === 'Enter' && addText()}
@@ -534,8 +513,6 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
                 outline: 'none',
               }}
             />
-
-            {/* Quick suggestions */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
               {TEXT_SUGGESTIONS.map(s => (
                 <button key={s} onClick={() => setTextInput(s)}
@@ -548,8 +525,6 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
                 </button>
               ))}
             </div>
-
-            {/* Font */}
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {FONTS.map(f => (
                 <button key={f} onClick={() => setTextFont(f)}
@@ -565,28 +540,23 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
                 </button>
               ))}
             </div>
-
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>
                   Size: {textSize}px
                 </p>
-                <input type="range" min={10} max={60}
-                  value={textSize}
+                <input type="range" min={10} max={60} value={textSize}
                   onChange={e => setTextSize(Number(e.target.value))}
                   style={{ width: '100%', accentColor: '#4ADE80' }} />
               </div>
               <div>
-                <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>
-                  Color
-                </p>
+                <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>Color</p>
                 <input type="color" value={textColor}
                   onChange={e => setTextColor(e.target.value)}
                   style={{ width: 36, height: 28, border: 'none',
                            background: 'none', cursor: 'pointer' }} />
               </div>
             </div>
-
             <button onClick={addText} disabled={!textInput}
               style={{
                 padding: '10px',
@@ -601,11 +571,10 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
           </div>
         )}
 
-        {/* Overlays panel */}
         {activePanel === 'overlays' && (
           <div>
             <p style={{ fontSize: 11, color: '#666', margin: '0 0 8px' }}>
-              Tap to add — drag to position on canvas
+              Tap to add · drag to position
             </p>
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
@@ -619,17 +588,14 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
                     cursor: 'pointer', textAlign: 'center',
                   }}>
                   <div style={{ fontSize: 22 }}>{c.emoji}</div>
-                  <div style={{ fontSize: 9, color: '#666',
-                                marginTop: 2 }}>{c.label}</div>
+                  <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
+                    {c.label}
+                  </div>
                 </button>
               ))}
             </div>
-            <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>
-              More emojis
-            </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {['🎉','🎊','💫','🌸','🦋','🙌','👑','🎵',
-                '🌈','☀️','🌙','⚡','🎯','🏅','📸','🖼️'].map(e => (
+              {MORE_EMOJIS.map(e => (
                 <button key={e} onClick={() => addEmoji(e)}
                   style={{
                     padding: '5px 8px', borderRadius: 16,
@@ -643,13 +609,10 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
           </div>
         )}
 
-        {/* Layout panel */}
         {activePanel === 'layout' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>
-                Layout — changing clears the canvas guides
-              </p>
+              <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>Layout</p>
               <div style={{ display: 'grid',
                             gridTemplateColumns: 'repeat(2,1fr)', gap: 6 }}>
                 {LAYOUTS.map(l => (
@@ -689,15 +652,11 @@ export default function StickerStudio({ onComplete, onBack }: StickerStudioProps
                 ))}
               </div>
             </div>
-            <div style={{
-              background: '#0a0a0a', borderRadius: 8,
-              padding: '8px 10px', fontSize: 11, color: '#555',
-              lineHeight: 1.6,
-            }}>
-              Die-cut lines (pink dashed) show where the Pixcut S1 will cut.
-              Registration marks (black squares) ensure accurate alignment.
-              Keep important content 3mm inside the dashed line.
-            </div>
+            <p style={{ fontSize: 11, color: '#555', margin: 0, lineHeight: 1.6 }}>
+              Pink dashed lines = Pixcut S1 die-cut path.
+              Black squares = registration marks for alignment.
+              Keep content 3mm inside the dashed border.
+            </p>
           </div>
         )}
       </div>

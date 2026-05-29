@@ -1,73 +1,82 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import SmartEditor             from '@/app/components/SmartEditor';
+import MemoryRecorder          from '@/app/components/MediaRecorder';
 
 const BUNDLES = [
   {
-    id: 'essential',
-    name: 'Momento Essential',
-    price: 18,
-    description: 'Instant 4×6 photo print + QR memory code',
+    id: 'essential', name: 'Momento Essential', price: 18,
+    desc: 'Instant 4×6 photo print + QR memory code',
     includes: ['4×6 photo print', 'QR code on print face', 'Ships in 4–5 days'],
-    popular: false,
+    popular: false, hasSticker: false,
   },
   {
-    id: 'classic',
-    name: 'Momento Classic',
-    price: 28,
-    description: 'Photo print + die-cut sticker sheet + QR memory code',
-    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet', 'QR code on print face', 'Ships in 4–5 days'],
-    popular: true,
+    id: 'classic', name: 'Momento Classic', price: 28,
+    desc: 'Photo print + die-cut sticker sheet + QR memory code',
+    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet',
+               'QR code on print face', 'Ships in 4–5 days'],
+    popular: true, hasSticker: true,
   },
   {
-    id: 'bundle',
-    name: 'Momento Bundle',
-    price: 45,
-    description: 'Everything in Classic plus a custom button or magnet',
-    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet', 'Custom button or magnet', 'Black card jacket', 'QR code on print face', 'Ships in 4–5 days'],
-    popular: false,
+    id: 'bundle', name: 'Momento Bundle', price: 45,
+    desc: 'Photo + stickers + button + card jacket + QR clip',
+    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet',
+               'Custom button or magnet', 'Black card jacket',
+               'QR code on print face', 'Ships in 4–5 days'],
+    popular: false, hasSticker: true,
   },
   {
-    id: 'signature',
-    name: 'Momento Signature',
-    price: 58,
-    description: 'The complete graduation keepsake experience',
-    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet', 'Custom button or magnet', 'Black card jacket', 'Metallic marker', 'QR video memory upgrade', 'Ships in 4–5 days'],
-    popular: false,
+    id: 'signature', name: 'Momento Signature', price: 58,
+    desc: 'The complete graduation keepsake experience',
+    includes: ['4×6 photo print', 'Die-cut 4×7 sticker sheet',
+               'Custom button or magnet', 'Black card jacket',
+               'Metallic marker', 'QR video memory upgrade',
+               'Ships in 4–5 days'],
+    popular: false, hasSticker: true,
   },
 ];
 
 const ADDONS = [
-  { id: 'qr_video', name: 'QR Video Memory Upgrade', price: 10 },
-  { id: 'card_jacket', name: 'Black Card Jacket', price: 5 },
-  { id: 'metallic_marker', name: 'Metallic Marker', price: 4 },
-  { id: 'oil_marker', name: 'Oil-Based Marker', price: 4 },
-  { id: 'extra_print', name: 'Extra Photo Print', price: 10 },
-  { id: 'extra_sticker', name: 'Extra Sticker Sheet', price: 12 },
+  { id: 'qr_video',        name: 'QR Video Memory Upgrade', price: 10 },
+  { id: 'card_jacket',     name: 'Black Card Jacket',        price: 5  },
+  { id: 'metallic_marker', name: 'Metallic Marker',          price: 4  },
+  { id: 'oil_marker',      name: 'Oil-Based Marker',         price: 4  },
+  { id: 'extra_print',     name: 'Extra Photo Print',        price: 10 },
+  { id: 'extra_sticker',   name: 'Extra Sticker Sheet',      price: 12 },
 ];
 
+type Step = 'bundle' | 'media' | 'design' | 'fulfillment' | 'details' | 'review';
+
 export default function GradEventPage() {
-  const [selected, setSelected]   = useState<string | null>(null);
-  const [addons, setAddons]       = useState<string[]>([]);
-  const [step, setStep]           = useState(1);
-  const [loading, setLoading]     = useState(false);
-  const [form, setForm]           = useState({
+  const [step,        setStep]        = useState<Step>('bundle');
+  const [bundle,      setBundle]      = useState<string | null>(null);
+  const [addons,      setAddons]      = useState<string[]>([]);
+  const [mediaFile,   setMediaFile]   = useState<File | null>(null);
+  const [mediaType,   setMediaType]   = useState<'video'|'audio'|null>(null);
+  const [editorState, setEditorState] = useState<any>(null);
+  const [photoFile,   setPhotoFile]   = useState<File | null>(null);
+  const [fulfillment, setFulfillment] = useState<'ship'|'pickup'>('ship');
+  const [boothActive, setBoothActive] = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [form,        setForm]        = useState({
     name: '', email: '', phone: '',
     address: '', city: '', state: '', zip: '',
-    grad_name: '', school: '', grad_date: '',
-    notes: '',
   });
 
-  const set = (k: string, v: string) =>
-    setForm(f => ({ ...f, [k]: v }));
-
-  const bundle = BUNDLES.find(b => b.id === selected);
-
-  const addonTotal = addons.reduce((sum, id) => {
+  const selectedBundle = BUNDLES.find(b => b.id === bundle);
+  const addonTotal     = addons.reduce((sum, id) => {
     const a = ADDONS.find(x => x.id === id);
     return sum + (a?.price || 0);
   }, 0);
+  const total = (selectedBundle?.price || 0) + addonTotal;
 
-  const total = (bundle?.price || 0) + addonTotal;
+  // Check if a booth is active for today
+  useEffect(() => {
+    fetch('/api/event/booth-check?slug=grad-2026')
+      .then(r => r.json())
+      .then(d => setBoothActive(d.booth_active || false))
+      .catch(() => {});
+  }, []);
 
   function toggleAddon(id: string) {
     setAddons(prev =>
@@ -75,18 +84,49 @@ export default function GradEventPage() {
     );
   }
 
+  function set(k: string, v: string) {
+    setForm(f => ({ ...f, [k]: v }));
+  }
+
   async function handleCheckout() {
     setLoading(true);
     try {
+      // Upload media if provided
+      let mediaUrl = null;
+      if (mediaFile) {
+        const fd = new FormData();
+        fd.append('file', mediaFile);
+        fd.append('folder', 'memory-clips');
+        const res  = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        mediaUrl   = data.url;
+      }
+
+      // Upload photo if provided
+      let photoUrl = null;
+      if (photoFile) {
+        const fd = new FormData();
+        fd.append('file', photoFile);
+        fd.append('folder', 'print-photos');
+        const res  = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        photoUrl   = data.url;
+      }
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bundle_id: selected,
+          bundle_id:    bundle,
           addons,
           form,
           total,
-          event_slug: 'grad-2026',
+          event_slug:   'grad-2026',
+          fulfillment_type: fulfillment,
+          media_url:    mediaUrl,
+          media_type:   mediaType,
+          photo_url:    photoUrl,
+          editor_state: editorState,
         }),
       });
       const data = await res.json();
@@ -98,79 +138,68 @@ export default function GradEventPage() {
   }
 
   const inputStyle = {
-    width: '100%',
-    padding: '10px 12px',
-    background: '#1a1a1a',
-    border: '1px solid #333',
-    borderRadius: 8,
-    color: '#fff',
-    fontSize: 14,
-    outline: 'none',
+    width: '100%', padding: '10px 12px',
+    background: '#1a1a1a', border: '1px solid #333',
+    borderRadius: 8, color: '#fff', fontSize: 14, outline: 'none',
   };
+
+  const STEPS: Step[] = ['bundle','media','design','fulfillment','details','review'];
+  const stepIndex      = STEPS.indexOf(step);
 
   return (
     <main style={{
-      minHeight: '100vh',
-      background: '#0a0a0a',
-      color: '#fff',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      padding: '24px 16px',
+      minHeight: '100vh', background: '#0a0a0a', color: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+      padding: '24px 16px 48px',
     }}>
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+      <div style={{ maxWidth: 640, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <p style={{ fontSize: 12, color: '#666', letterSpacing: 4,
-                      textTransform: 'uppercase', margin: '0 0 12px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <p style={{ fontSize: 11, color: '#555', letterSpacing: 4,
+                      textTransform: 'uppercase', margin: '0 0 8px' }}>
             Un Momento Prints
           </p>
-          <h1 style={{ fontSize: 28, fontWeight: 500, margin: '0 0 8px' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 500, margin: '0 0 4px' }}>
             Graduation Season 2026
           </h1>
-          <p style={{ fontSize: 14, color: '#888', margin: 0, lineHeight: 1.6 }}>
-            Order your keepsake. We ship anywhere in the US in 4–5 days.
-            The moments that matter most deserve to exist in the real world.
+          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
+            Order online · ships anywhere in the US in 4–5 days
           </p>
         </div>
 
-        {/* Step indicators */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
-          {['Choose bundle', 'Your details', 'Checkout'].map((s, i) => (
-            <div key={s} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{
-                height: 4, borderRadius: 2, marginBottom: 6,
-                background: step > i + 1
-                  ? '#4ADE80'
-                  : step === i + 1
-                    ? '#fff'
-                    : '#333',
-              }}/>
-              <span style={{
-                fontSize: 11,
-                color: step === i + 1 ? '#fff' : '#555'
-              }}>
-                {s}
-              </span>
-            </div>
-          ))}
+        {/* Step progress */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
+          {['Bundle','Memory','Design','Delivery','Details','Review'].map(
+            (s, i) => (
+              <div key={s} style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{
+                  height: 4, borderRadius: 2, marginBottom: 4,
+                  background: i < stepIndex
+                    ? '#4ADE80' : i === stepIndex ? '#fff' : '#333',
+                }}/>
+                <span style={{
+                  fontSize: 9,
+                  color: i === stepIndex ? '#fff' : '#444',
+                }}>
+                  {s}
+                </span>
+              </div>
+            )
+          )}
         </div>
 
-        {/* Step 1 - Choose bundle */}
-        {step === 1 && (
+        {/* STEP 1 — Bundle */}
+        {step === 'bundle' && (
           <div>
             {BUNDLES.map(b => (
-              <div
-                key={b.id}
-                onClick={() => setSelected(b.id)}
+              <div key={b.id} onClick={() => setBundle(b.id)}
                 style={{
-                  border: selected === b.id
-                    ? '2px solid #4ADE80'
-                    : '1px solid #222',
-                  borderRadius: 12,
-                  padding: '1rem',
-                  marginBottom: 10,
+                  border: bundle === b.id
+                    ? '2px solid #4ADE80' : '1px solid #222',
+                  borderRadius: 12, padding: '1rem', marginBottom: 10,
                   cursor: 'pointer',
-                  background: selected === b.id ? '#0d1f0d' : '#111',
+                  background: bundle === b.id ? '#0d1f0d' : '#111',
                   position: 'relative',
                 }}
               >
@@ -191,7 +220,7 @@ export default function GradEventPage() {
                     <p style={{ fontWeight: 600, fontSize: 15,
                                 margin: '0 0 4px' }}>{b.name}</p>
                     <p style={{ fontSize: 13, color: '#888',
-                                margin: '0 0 10px' }}>{b.description}</p>
+                                margin: '0 0 8px' }}>{b.desc}</p>
                     <ul style={{ paddingLeft: 16, margin: 0 }}>
                       {b.includes.map(item => (
                         <li key={item} style={{ fontSize: 12,
@@ -202,39 +231,33 @@ export default function GradEventPage() {
                       ))}
                     </ul>
                   </div>
-                  <div style={{ textAlign: 'right',
-                                flexShrink: 0, marginLeft: 16 }}>
-                    <p style={{ fontSize: 22, fontWeight: 600,
-                                margin: 0 }}>${b.price}</p>
-                  </div>
+                  <p style={{ fontSize: 22, fontWeight: 700,
+                              margin: 0, flexShrink: 0,
+                              marginLeft: 16 }}>
+                    ${b.price}
+                  </p>
                 </div>
               </div>
             ))}
 
-            {/* Add-ons */}
-            {selected && (
-              <div style={{ marginTop: 20 }}>
+            {bundle && (
+              <div style={{ marginTop: 16 }}>
                 <p style={{ fontSize: 13, color: '#888',
                             marginBottom: 10 }}>
                   Add-ons (optional)
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {ADDONS.map(a => (
-                    <button
-                      key={a.id}
-                      onClick={() => toggleAddon(a.id)}
+                    <button key={a.id} onClick={() => toggleAddon(a.id)}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: 20,
+                        padding: '6px 12px', borderRadius: 20,
                         border: addons.includes(a.id)
-                          ? '1px solid #4ADE80'
-                          : '1px solid #333',
+                          ? '1px solid #4ADE80' : '1px solid #333',
                         background: addons.includes(a.id)
                           ? '#0d1f0d' : 'transparent',
                         color: addons.includes(a.id)
                           ? '#4ADE80' : '#888',
-                        fontSize: 12,
-                        cursor: 'pointer',
+                        fontSize: 12, cursor: 'pointer',
                       }}
                     >
                       {a.name} +${a.price}
@@ -244,27 +267,157 @@ export default function GradEventPage() {
               </div>
             )}
 
-            {selected && (
-              <button
-                onClick={() => setStep(2)}
+            {bundle && (
+              <button onClick={() => setStep('media')}
                 style={{
-                  width: '100%', marginTop: 20,
-                  padding: '14px',
+                  width: '100%', marginTop: 16, padding: 14,
                   background: '#4ADE80', color: '#000',
                   border: 'none', borderRadius: 10,
-                  fontSize: 15, fontWeight: 700,
-                  cursor: 'pointer',
+                  fontSize: 15, fontWeight: 700, cursor: 'pointer',
                 }}
               >
-                Continue — ${total}
+                Continue — ${total} →
               </button>
             )}
           </div>
         )}
 
-        {/* Step 2 - Details */}
-        {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* STEP 2 — Memory clip */}
+        {step === 'media' && (
+          <div>
+            <MemoryRecorder
+              onComplete={(file, type) => {
+                setMediaFile(file);
+                setMediaType(type);
+                setStep('design');
+              }}
+              onSkip={() => setStep('design')}
+            />
+            <button onClick={() => setStep('bundle')}
+              style={{
+                marginTop: 8, width: '100%', padding: 10,
+                border: '1px solid #333', borderRadius: 10,
+                background: 'transparent', color: '#666',
+                fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              ← Back
+            </button>
+          </div>
+        )}
+
+        {/* STEP 3 — Smart editor */}
+        {step === 'design' && (
+          <div>
+            <p style={{ fontSize: 13, color: '#888',
+                        margin: '0 0 16px', lineHeight: 1.6 }}>
+              Upload your photo and design your print.
+              What you see is exactly what gets printed.
+            </p>
+            <SmartEditor
+              showSticker={selectedBundle?.hasSticker || false}
+              defaultGradName=""
+              onComplete={(state, file) => {
+                setEditorState(state);
+                setPhotoFile(file);
+                setStep('fulfillment');
+              }}
+            />
+            <button onClick={() => setStep('media')}
+              style={{
+                marginTop: 8, width: '100%', padding: 10,
+                border: '1px solid #333', borderRadius: 10,
+                background: 'transparent', color: '#666',
+                fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              ← Back
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4 — Fulfillment */}
+        {step === 'fulfillment' && (
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 500,
+                        margin: '0 0 16px' }}>
+              How would you like to receive your order?
+            </p>
+
+            <div onClick={() => setFulfillment('ship')}
+              style={{
+                border: fulfillment === 'ship'
+                  ? '2px solid #4ADE80' : '1px solid #222',
+                borderRadius: 12, padding: '1rem',
+                marginBottom: 10, cursor: 'pointer',
+                background: fulfillment === 'ship' ? '#0d1f0d' : '#111',
+              }}
+            >
+              <p style={{ fontWeight: 600, fontSize: 15,
+                          margin: '0 0 4px' }}>
+                📦 Ship to my door
+              </p>
+              <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
+                Ships anywhere in the US in 4–5 business days via Gelato.
+              </p>
+            </div>
+
+            {boothActive && (
+              <div onClick={() => setFulfillment('pickup')}
+                style={{
+                  border: fulfillment === 'pickup'
+                    ? '2px solid #4ADE80' : '1px solid #222',
+                  borderRadius: 12, padding: '1rem',
+                  marginBottom: 10, cursor: 'pointer',
+                  background: fulfillment === 'pickup'
+                    ? '#0d1f0d' : '#111',
+                  position: 'relative',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: -10, left: 12,
+                  background: '#4ADE80', color: '#000',
+                  fontSize: 10, fontWeight: 700,
+                  padding: '2px 8px', borderRadius: 10,
+                }}>
+                  AVAILABLE TODAY
+                </span>
+                <p style={{ fontWeight: 600, fontSize: 15,
+                            margin: '0 0 4px' }}>
+                  🎪 Pick up at the booth
+                </p>
+                <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
+                  We're set up nearby. Print ready in under 2 minutes.
+                  No shipping cost.
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setStep('design')}
+                style={{
+                  flex: 1, padding: 12, border: '1px solid #333',
+                  borderRadius: 10, background: 'transparent',
+                  color: '#fff', fontSize: 14, cursor: 'pointer',
+                }}>
+                ← Back
+              </button>
+              <button onClick={() => setStep('details')}
+                style={{
+                  flex: 2, padding: 12, background: '#4ADE80',
+                  color: '#000', border: 'none', borderRadius: 10,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}>
+                Continue →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5 — Details */}
+        {step === 'details' && (
+          <div style={{ display: 'flex',
+                        flexDirection: 'column', gap: 12 }}>
             <p style={{ fontWeight: 500, fontSize: 14,
                         margin: '0 0 4px' }}>
               Your information
@@ -279,91 +432,60 @@ export default function GradEventPage() {
               value={form.phone}
               onChange={e => set('phone', e.target.value)}/>
 
-            <p style={{ fontWeight: 500, fontSize: 14,
-                        margin: '8px 0 4px' }}>
-              Shipping address
-            </p>
-            <input style={inputStyle} placeholder="Street address *"
-              value={form.address}
-              onChange={e => set('address', e.target.value)}/>
-            <div style={{ display: 'grid',
-                          gridTemplateColumns: '2fr 1fr',
-                          gap: 8 }}>
-              <input style={inputStyle} placeholder="City *"
-                value={form.city}
-                onChange={e => set('city', e.target.value)}/>
-              <input style={inputStyle} placeholder="State *"
-                value={form.state}
-                onChange={e => set('state', e.target.value)}/>
-            </div>
-            <input style={inputStyle} placeholder="ZIP code *"
-              value={form.zip}
-              onChange={e => set('zip', e.target.value)}/>
-
-            <p style={{ fontWeight: 500, fontSize: 14,
-                        margin: '8px 0 4px' }}>
-              About your graduation
-            </p>
-            <input style={inputStyle}
-              placeholder="Graduate's name (for print border)"
-              value={form.grad_name}
-              onChange={e => set('grad_name', e.target.value)}/>
-            <input style={inputStyle}
-              placeholder="School name (optional)"
-              value={form.school}
-              onChange={e => set('school', e.target.value)}/>
-            <input style={inputStyle}
-              placeholder="Graduation date (optional)"
-              value={form.grad_date}
-              onChange={e => set('grad_date', e.target.value)}/>
-            <textarea
-              style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
-              placeholder="Anything else? (special requests, etc.)"
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}/>
-
-            <p style={{ fontSize: 11, color: '#555',
-                        margin: '4px 0', lineHeight: 1.6 }}>
-              You will upload your photo and video message
-              after checkout on the confirmation page.
-            </p>
+            {fulfillment === 'ship' && (
+              <>
+                <p style={{ fontWeight: 500, fontSize: 14,
+                            margin: '4px 0' }}>
+                  Shipping address
+                </p>
+                <input style={inputStyle} placeholder="Street address *"
+                  value={form.address}
+                  onChange={e => set('address', e.target.value)}/>
+                <div style={{ display: 'grid',
+                              gridTemplateColumns: '2fr 1fr', gap: 8 }}>
+                  <input style={inputStyle} placeholder="City *"
+                    value={form.city}
+                    onChange={e => set('city', e.target.value)}/>
+                  <input style={inputStyle} placeholder="State *"
+                    value={form.state}
+                    onChange={e => set('state', e.target.value)}/>
+                </div>
+                <input style={inputStyle} placeholder="ZIP code *"
+                  value={form.zip}
+                  onChange={e => set('zip', e.target.value)}/>
+              </>
+            )}
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setStep(1)}
+              <button onClick={() => setStep('fulfillment')}
                 style={{
-                  flex: 1, padding: 12,
-                  border: '1px solid #333',
+                  flex: 1, padding: 12, border: '1px solid #333',
                   borderRadius: 10, background: 'transparent',
                   color: '#fff', fontSize: 14, cursor: 'pointer',
-                }}
-              >
+                }}>
                 ← Back
               </button>
               <button
                 onClick={() => {
-                  if (form.name && form.email &&
+                  const valid = form.name && form.email &&
+                    (fulfillment === 'pickup' || (
                       form.address && form.city &&
-                      form.state && form.zip) {
-                    setStep(3);
-                  }
+                      form.state && form.zip));
+                  if (valid) setStep('review');
                 }}
                 style={{
-                  flex: 2, padding: 12,
-                  background: '#4ADE80', color: '#000',
-                  border: 'none', borderRadius: 10,
-                  fontSize: 14, fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
+                  flex: 2, padding: 12, background: '#4ADE80',
+                  color: '#000', border: 'none', borderRadius: 10,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}>
                 Review order →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3 - Review and pay */}
-        {step === 3 && bundle && (
+        {/* STEP 6 — Review */}
+        {step === 'review' && selectedBundle && (
           <div>
             <div style={{
               background: '#111', borderRadius: 12,
@@ -374,30 +496,34 @@ export default function GradEventPage() {
                 Order summary
               </p>
               {[
-                ['Bundle', `${bundle.name} — $${bundle.price}`],
+                ['Bundle', `${selectedBundle.name} — $${selectedBundle.price}`],
                 ...addons.map(id => {
                   const a = ADDONS.find(x => x.id === id);
                   return [a?.name || '', `+$${a?.price}`];
                 }),
-                ['Ship to', `${form.name}, ${form.city} ${form.state}`],
-                ['Graduate', form.grad_name || '—'],
+                ['Memory clip', mediaFile
+                  ? `✓ ${mediaType} recorded`
+                  : 'Not recorded'],
+                ['Photo design', editorState?.photoUrl
+                  ? '✓ Designed' : 'Not uploaded'],
+                ['Delivery', fulfillment === 'pickup'
+                  ? 'Pick up at booth' : `Ship to ${form.city}, ${form.state}`],
+                ['Name', form.name],
+                ['Email', form.email],
               ].map(([k, v]) => (
                 <div key={k} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'flex', justifyContent: 'space-between',
                   padding: '5px 0',
-                  borderBottom: '1px solid #222',
-                  fontSize: 13,
+                  borderBottom: '1px solid #222', fontSize: 13,
                 }}>
                   <span style={{ color: '#888' }}>{k}</span>
-                  <span>{v}</span>
+                  <span style={{ color: '#fff', maxWidth: 200,
+                                 textAlign: 'right' }}>{v}</span>
                 </div>
               ))}
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 0 0',
-                fontSize: 16, fontWeight: 700,
+                display: 'flex', justifyContent: 'space-between',
+                padding: '10px 0 0', fontSize: 16, fontWeight: 700,
               }}>
                 <span>Total</span>
                 <span style={{ color: '#4ADE80' }}>${total}</span>
@@ -406,26 +532,19 @@ export default function GradEventPage() {
 
             <p style={{ fontSize: 11, color: '#555',
                         lineHeight: 1.6, margin: '0 0 16px' }}>
-              Secure checkout via Stripe. You will upload your
-              photo and video message on the confirmation page.
-              Ships anywhere in the US in 4–5 business days.
+              Secure checkout via Stripe. Sales tax calculated at checkout.
             </p>
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setStep(2)}
+              <button onClick={() => setStep('details')}
                 style={{
-                  flex: 1, padding: 12,
-                  border: '1px solid #333',
+                  flex: 1, padding: 12, border: '1px solid #333',
                   borderRadius: 10, background: 'transparent',
                   color: '#fff', fontSize: 14, cursor: 'pointer',
-                }}
-              >
+                }}>
                 ← Back
               </button>
-              <button
-                onClick={handleCheckout}
-                disabled={loading}
+              <button onClick={handleCheckout} disabled={loading}
                 style={{
                   flex: 2, padding: 12,
                   background: loading ? '#333' : '#4ADE80',
@@ -433,16 +552,16 @@ export default function GradEventPage() {
                   border: 'none', borderRadius: 10,
                   fontSize: 14, fontWeight: 700,
                   cursor: loading ? 'wait' : 'pointer',
-                }}
-              >
-                {loading ? 'Opening checkout…' : `Pay $${total} →`}
+                }}>
+                {loading ? 'Opening checkout…'
+                  : `Pay $${total} →`}
               </button>
             </div>
           </div>
         )}
 
         <p style={{ textAlign: 'center', fontSize: 11,
-                    color: '#333', marginTop: 32 }}>
+                    color: '#333', marginTop: 24 }}>
           © 2026 Un Momento Prints · Ships anywhere in the US
         </p>
       </div>

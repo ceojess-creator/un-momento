@@ -256,7 +256,9 @@ function StaffAssignModal({
     <div style={{ marginBottom: 24 }}>
       <div style={{ display:'flex', justifyContent:'space-between',
                     alignItems:'center', marginBottom:10 }}>
-        {sectionLabel('Staff assignment')}
+        <p style={{ fontSize:11, fontWeight:600, color:C.muted,
+                    letterSpacing:1, textTransform:'uppercase',
+                    margin:0 }}>Staff assignment</p>
         <button onClick={() => setOpen(!open)} style={{
           padding:'6px 14px', background:C.green, color:'#fff',
           border:'none', borderRadius:7, fontSize:12,

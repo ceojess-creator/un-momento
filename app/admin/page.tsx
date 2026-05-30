@@ -45,7 +45,7 @@ export default async function AdminPage() {
     supabase.from('reorder_alerts').select('*'),
     supabase.from('referral_credits').select('amount,referrer_handle,created_at').order('created_at',{ascending:false}).limit(50),
     supabase.from('event_pages').select('*').order('event_date',{ascending:false}).limit(20),
-    supabase.from('event_hardware').select('*, event_pages(name, slug)').order('device_type'),
+    console.log('[admin] hardware count:', hardware?.length, hardware?.[0]);
     supabase.from('assembly_queue').select('*').limit(50),
     supabase.from('active_print_queue').select('*').limit(50),
     supabase.from('event_staff_roster').select('*').limit(100),

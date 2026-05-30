@@ -176,7 +176,7 @@ export default function GradEventPage() {
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:24 }}>
           <p style={{ fontSize:11, color:'#555', letterSpacing:4, textTransform:'uppercase', margin:'0 0 8px' }}>
-            Un Momento Prints
+            Un Momento
           </p>
           <h1 style={{ fontSize:24, fontWeight:500, margin:'0 0 4px' }}>Graduation Season 2026</h1>
           <p style={{ fontSize:13, color:'#888', margin:0 }}>Order online · ships anywhere in the US in 4–5 days</p>
@@ -518,7 +518,7 @@ export default function GradEventPage() {
         )}
 
         <p style={{ textAlign:'center', fontSize:11, color:'#333', marginTop:24 }}>
-          © 2026 Un Momento Prints · Ships anywhere in the US
+          © 2026 Un Momento · Ships anywhere in the US
         </p>
       </div>
     </main>

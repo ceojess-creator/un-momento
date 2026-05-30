@@ -85,7 +85,7 @@ export default function SuccessContent() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <p style={{ fontSize: 12, color: '#666', letterSpacing: 4,
                       textTransform: 'uppercase', margin: '0 0 12px' }}>
-            Un Momento Prints
+            Un Momento
           </p>
           <h1 style={{ fontSize: 24, fontWeight: 500, margin: '0 0 8px' }}>
             Payment confirmed 🎉

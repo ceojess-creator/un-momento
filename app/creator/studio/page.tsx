@@ -180,7 +180,7 @@ export default function CreatorStudio() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <p style={{ fontSize: 12, color: '#666', letterSpacing: 4,
                       textTransform: 'uppercase', margin: '0 0 8px' }}>
-            Un Momento Prints
+            Un Momento
           </p>
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: '0 0 6px' }}>
             Creator Studio

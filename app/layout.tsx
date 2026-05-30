@@ -3,7 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Un Momento Prints',
+  title: 'Un Momento',
   description: 'The moments that matter most deserve to exist in the real world. Instant photo prints, die-cut stickers, and custom keepsakes — ships anywhere in the US.',
 };
 

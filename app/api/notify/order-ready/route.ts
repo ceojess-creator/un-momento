@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
     const message = custom_message ||
       `Hi ${name}! 🎓 Your Un Momento order is ready for pickup at ${location}. ` +
-      `Show this text to your Hand-off Associate. Thank you! — Un Momento Prints`;
+      `Show this text to your Hand-off Associate. Thank you! — Un Momento`;
 
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;

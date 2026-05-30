@@ -63,7 +63,7 @@ export async function POST(request: Request) {
             'Content-Type':  'application/json',
           },
           body: JSON.stringify({
-            from:    'Un Momento Prints <orders@unmomentoprints.com>',
+            from:    'Un Momento <orders@unmomentoprints.com>',
             to:      orderData.buyer_email,
             subject: 'Your Un Momento print has shipped! 📦',
             html: `
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
                 <p>Scan the QR code on your print to hear your memory clip — forever.</p>
                 <hr/>
                 <p style="color:#94a3b8;font-size:12px;">
-                  Un Momento Prints ·
+                  Un Momento ·
                   The moments that matter most deserve to exist in the real world.
                 </p>
               </div>

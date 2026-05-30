@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
-const BASE_W = 540;
-const BASE_H = 360;
+const BASE_W = 360;
+const BASE_H = 240;
 
 const TEMPLATES = [
   {
@@ -94,7 +94,7 @@ const TEXT_TEMPLATES = [
   'DONE!',
 ];
 
-const GUTTER = 3;
+const GUTTER = 2;
 
 interface SlotState {
   photoUrl: string | null;
@@ -122,6 +122,7 @@ export default function CollageEditor({
   const fabricRef    = useRef<any>(null);
   const fabricMod    = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const drawingRef   = useRef(false);
 
   const [orientation,  setOrientation]  = useState<'landscape'|'portrait'>('landscape');
   const [templateId,   setTemplateId]   = useState('single');
@@ -137,7 +138,7 @@ export default function CollageEditor({
   const [overlapWarn,  setOverlapWarn]  = useState<string | null>(null);
   const [textInput,    setTextInput]    = useState('');
   const [textColor,    setTextColor]    = useState('#ffffff');
-  const [textSize,     setTextSize]     = useState(20);
+  const [textSize,     setTextSize]     = useState(16);
   const [gradName,     setGradName]     = useState(defaultGradName);
   const [school,       setSchool]       = useState(defaultSchool);
   const [qrPlacement,  setQrPlacement]  = useState('border_strip');
@@ -151,7 +152,7 @@ export default function CollageEditor({
   const totalSlots  = template.slots.length;
   const filledSlots = slots.filter((s, i) => i < totalSlots && s.photoUrl).length;
 
-  // Initialize Fabric canvas
+  // Initialize Fabric canvas once
   useEffect(() => {
     let fc: any = null;
     import('fabric').then((f) => {
@@ -159,9 +160,9 @@ export default function CollageEditor({
       if (!canvasRef.current) return;
 
       fc = new f.Canvas(canvasRef.current, {
-        width:           PRINT_W,
-        height:          PRINT_H,
-        backgroundColor: '#000',
+        width:           BASE_W,
+        height:          BASE_H,
+        backgroundColor: '#111',
         selection:       true,
       });
 
@@ -178,81 +179,88 @@ export default function CollageEditor({
     return () => { try { fc?.dispose(); } catch {} };
   }, []);
 
-  // Resize canvas when orientation changes
+  // Redraw when state changes
   useEffect(() => {
-    if (!fabricRef.current) return;
-    fabricRef.current.setWidth(PRINT_W);
-    fabricRef.current.setHeight(PRINT_H);
-    fabricRef.current.renderAll();
-  }, [orientation]);
-
-  // Redraw when anything changes
-  useEffect(() => {
-    if (!ready) return;
+    if (!ready || !fabricRef.current || !fabricMod.current) return;
+    // Update canvas dimensions for orientation
+    fabricRef.current.setDimensions({ width: PRINT_W, height: PRINT_H });
     drawCanvas();
-  }, [templateId, slots, qrPlacement, gradName, school, globalFilter, ready, orientation]);
+  }, [ready, templateId, slots, qrPlacement, gradName, school, globalFilter, orientation, activeSlot]);
 
-  async function drawCanvas() {
+  const drawCanvas = useCallback(async () => {
     const fc = fabricRef.current;
     const f  = fabricMod.current;
-    if (!fc || !f) return;
+    if (!fc || !f || drawingRef.current) return;
+    drawingRef.current = true;
 
-    // Keep overlay objects (text, emoji) — remove only slot objects
+    // Save overlay objects before clearing
     const overlays = fc.getObjects().filter((o: any) =>
       o.customData?.type === 'overlay'
     );
+
     fc.clear();
-    fc.backgroundColor = '#000';
+    fc.backgroundColor = '#111';
 
     const tpl = TEMPLATES.find(t => t.id === templateId)!;
 
     for (let i = 0; i < tpl.slots.length; i++) {
       const slot  = tpl.slots[i];
       const state = slots[i];
-      const x     = slot.x * PRINT_W + GUTTER;
-      const y     = slot.y * PRINT_H + GUTTER;
-      const w     = slot.w * PRINT_W - GUTTER * 2;
-      const h     = slot.h * PRINT_H - GUTTER * 2;
+      const x     = Math.floor(slot.x * PRINT_W) + GUTTER;
+      const y     = Math.floor(slot.y * PRINT_H) + GUTTER;
+      const w     = Math.floor(slot.w * PRINT_W) - GUTTER * 2;
+      const h     = Math.floor(slot.h * PRINT_H) - GUTTER * 2;
 
       if (state.photoUrl) {
-        const img = await f.FabricImage.fromURL(
-          state.photoUrl, { crossOrigin: 'anonymous' }
-        );
-        const imgAspect  = img.width! / img.height!;
-        const slotAspect = w / h;
-        const scale      = (imgAspect > slotAspect
-          ? (h / img.height!)
-          : (w / img.width!)) * state.zoom;
+        try {
+          const img = await f.FabricImage.fromURL(
+            state.photoUrl, { crossOrigin: 'anonymous' }
+          );
+          const imgAspect  = img.width! / img.height!;
+          const slotAspect = w / h;
+          const scale      = (imgAspect > slotAspect
+            ? (h / img.height!)
+            : (w / img.width!)) * state.zoom;
 
-        img.set({
-          left:       x + w / 2 + state.offsetX,
-          top:        y + h / 2 + state.offsetY,
-          scaleX:     scale,
-          scaleY:     scale,
-          originX:    'center',
-          originY:    'center',
-          clipPath:   new f.Rect({
-            left: x, top: y, width: w, height: h,
-            absolutePositioned: true,
-          }),
-          customData: { type: 'slot', index: i },
-        });
-        fc.add(img);
+          img.set({
+            left:       x + w / 2,
+            top:        y + h / 2,
+            scaleX:     scale,
+            scaleY:     scale,
+            originX:    'center',
+            originY:    'center',
+            clipPath:   new f.Rect({
+              left: x, top: y, width: w, height: h,
+              absolutePositioned: true,
+            }),
+            customData: { type: 'slot', index: i },
+            selectable: true,
+            hasControls: true,
+          });
+          fc.add(img);
+        } catch (e) {
+          console.error('Image load error:', e);
+        }
       } else {
         fc.add(new f.Rect({
-          left: x, top: y, width: w, height: h,
-          fill:        i === activeSlot ? '#1a3a1a' : '#111',
-          stroke:      i === activeSlot ? '#4ADE80' : '#333',
-          strokeWidth: 1.5,
-          rx: 4, ry: 4,
-          customData:  { type: 'slot', index: i },
+          left:        x,
+          top:         y,
+          width:       w,
+          height:      h,
+          fill:        i === activeSlot ? '#0d2a0d' : '#1a1a1a',
+          stroke:      i === activeSlot ? '#4ADE80' : '#444',
+          strokeWidth: 1,
+          rx: 3, ry: 3,
+          selectable:  false,
+          evented:     true,
+          customData:  { type: 'empty_slot', index: i },
         }));
         fc.add(new f.FabricText(
           i === activeSlot ? '+ tap to add' : `${i + 1}`,
           {
             left:       x + w / 2,
             top:        y + h / 2,
-            fontSize:   Math.min(w, h) * 0.18,
+            fontSize:   Math.min(w, h) * 0.16,
             fill:       i === activeSlot ? '#4ADE80' : '#555',
             originX:    'center',
             originY:    'center',
@@ -263,16 +271,16 @@ export default function CollageEditor({
       }
     }
 
-    // Re-add overlays on top
+    // Re-add saved overlays on top
     overlays.forEach((o: any) => fc.add(o));
 
     // Border strip
     if (qrPlacement === 'border_strip') {
-      const STRIP = 36;
+      const STRIP = 28;
       fc.add(new f.Rect({
         left: 0, top: PRINT_H - STRIP,
         width: PRINT_W, height: STRIP,
-        fill: 'rgba(255,255,255,0.95)',
+        fill: 'rgba(255,255,255,0.96)',
         selectable: false, evented: false,
       }));
       fc.add(new f.FabricText(
@@ -280,55 +288,63 @@ export default function CollageEditor({
           ? `${gradName}${school ? ` · ${school}` : ''} · unmomentoprints.com`
           : 'unmomentoprints.com',
         {
-          left: 10, top: PRINT_H - STRIP + STRIP / 2,
-          fontSize: 10, fill: '#333',
-          originY: 'center',
+          left:       8,
+          top:        PRINT_H - STRIP + STRIP / 2,
+          fontSize:   8,
+          fill:       '#333',
+          originY:    'center',
           selectable: false, evented: false,
         }
       ));
       fc.add(new f.Rect({
-        left: PRINT_W - 34, top: PRINT_H - STRIP + 3,
-        width: 30, height: 30, fill: '#000',
+        left:       PRINT_W - 26,
+        top:        PRINT_H - STRIP + 2,
+        width:      22, height: 22,
+        fill:       '#000',
         selectable: false, evented: false,
       }));
       fc.add(new f.FabricText('QR', {
-        left: PRINT_W - 19, top: PRINT_H - STRIP + 18,
-        fontSize: 8, fill: '#fff',
-        originX: 'center', originY: 'center',
+        left:       PRINT_W - 15,
+        top:        PRINT_H - STRIP + 13,
+        fontSize:   6, fill: '#fff',
+        originX:    'center', originY: 'center',
         selectable: false, evented: false,
       }));
     }
 
     // Corner QR
     if (qrPlacement === 'corner_br' || qrPlacement === 'corner_bl') {
-      const qx = qrPlacement === 'corner_br' ? PRINT_W - 42 : 6;
+      const qx = qrPlacement === 'corner_br' ? PRINT_W - 30 : 4;
       fc.add(new f.Rect({
-        left: qx - 3, top: PRINT_H - 42,
-        width: 42, height: 42,
+        left: qx - 2, top: PRINT_H - 32,
+        width: 30, height: 30,
         fill: 'rgba(255,255,255,0.9)',
         selectable: false, evented: false,
       }));
       fc.add(new f.Rect({
-        left: qx, top: PRINT_H - 39,
-        width: 36, height: 36, fill: '#000',
+        left: qx, top: PRINT_H - 30,
+        width: 26, height: 26, fill: '#000',
         selectable: false, evented: false,
       }));
     }
 
-    // Safe zone
+    // Safe zone guide
     fc.add(new f.Rect({
-      left: 16, top: 16,
-      width:  PRINT_W - 32,
-      height: PRINT_H - 32 - (qrPlacement === 'border_strip' ? 40 : 0),
-      fill: 'transparent',
-      stroke: 'rgba(255,80,80,0.3)',
-      strokeWidth: 1, strokeDashArray: [4, 4],
-      selectable: false, evented: false,
-      customData: { type: 'guide' },
+      left:            10, top: 10,
+      width:           PRINT_W - 20,
+      height:          PRINT_H - 20 - (qrPlacement === 'border_strip' ? 32 : 0),
+      fill:            'transparent',
+      stroke:          'rgba(255,80,80,0.25)',
+      strokeWidth:     0.5,
+      strokeDashArray: [3, 3],
+      selectable:      false,
+      evented:         false,
+      customData:      { type: 'guide' },
     }));
 
     fc.renderAll();
-  }
+    drawingRef.current = false;
+  }, [templateId, slots, qrPlacement, gradName, school, orientation, activeSlot, PRINT_W, PRINT_H]);
 
   function detectOverlaps(fc: any) {
     const objs = fc.getObjects().filter((o: any) =>
@@ -366,6 +382,30 @@ export default function CollageEditor({
     e.target.value = '';
   }
 
+  function handleCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (!canvas || !fabricRef.current) return;
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = PRINT_W / rect.width;
+    const scaleY = PRINT_H / rect.height;
+    const mx     = (e.clientX - rect.left) * scaleX;
+    const my     = (e.clientY - rect.top)  * scaleY;
+
+    const tpl = TEMPLATES.find(t => t.id === templateId)!;
+    for (let i = 0; i < tpl.slots.length; i++) {
+      const slot = tpl.slots[i];
+      const x    = slot.x * PRINT_W + GUTTER;
+      const y    = slot.y * PRINT_H + GUTTER;
+      const w    = slot.w * PRINT_W - GUTTER * 2;
+      const h    = slot.h * PRINT_H - GUTTER * 2;
+      if (mx >= x && mx <= x+w && my >= y && my <= y+h) {
+        setActiveSlot(i);
+        if (!slots[i].photoUrl) fileInputRef.current?.click();
+        return;
+      }
+    }
+  }
+
   function updateSlot(key: keyof SlotState, value: any) {
     setSlots(prev => prev.map((s, i) =>
       i === activeSlot ? { ...s, [key]: value } : s
@@ -393,9 +433,9 @@ export default function CollageEditor({
   function addEmoji(emoji: string) {
     if (!fabricRef.current || !fabricMod.current) return;
     const text = new fabricMod.current.FabricText(emoji, {
-      left:       PRINT_W / 2 + (Math.random()*60-30),
-      top:        PRINT_H / 3  + (Math.random()*40-20),
-      fontSize:   32,
+      left:       PRINT_W / 2 + (Math.random()*40-20),
+      top:        PRINT_H / 3  + (Math.random()*30-15),
+      fontSize:   24,
       originX:    'center',
       originY:    'center',
       customData: { type: 'overlay', label: emoji },
@@ -431,7 +471,7 @@ export default function CollageEditor({
       .forEach((o: any) => { o.visible = false; });
     fabricRef.current.renderAll();
     const dataUrl = fabricRef.current.toDataURL({
-      format: 'jpeg', quality: 0.95, multiplier: 3,
+      format: 'jpeg', quality: 0.95, multiplier: 5,
     });
     fabricRef.current.getObjects()
       .filter((o: any) => o.customData?.type === 'guide')
@@ -535,27 +575,9 @@ export default function CollageEditor({
         border: '1px solid #333', marginBottom: 10,
         display: ready ? 'block' : 'none',
       }}>
-        <canvas ref={canvasRef}
-          onClick={(e) => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const rect   = canvas.getBoundingClientRect();
-            const scaleX = PRINT_W / rect.width;
-            const scaleY = PRINT_H / rect.height;
-            const mx     = (e.clientX - rect.left) * scaleX;
-            const my     = (e.clientY - rect.top)  * scaleY;
-            const tpl    = TEMPLATES.find(t => t.id === templateId)!;
-            tpl.slots.forEach((slot, i) => {
-              const x = slot.x * PRINT_W;
-              const y = slot.y * PRINT_H;
-              const w = slot.w * PRINT_W;
-              const h = slot.h * PRINT_H;
-              if (mx >= x && mx <= x+w && my >= y && my <= y+h) {
-                setActiveSlot(i);
-                if (!slots[i].photoUrl) fileInputRef.current?.click();
-              }
-            });
-          }}
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
           style={{ width: '100%', display: 'block', cursor: 'pointer' }}
         />
       </div>
@@ -570,30 +592,30 @@ export default function CollageEditor({
           background: '#111', borderRadius: 8, padding: '8px',
           border: '1px solid #222',
         }}>
-          <span style={{ fontSize: 12, color: '#888',
+          <span style={{ fontSize: 11, color: '#888',
                          flex: 1, alignSelf: 'center', minWidth: 60 }}>
             {selectedObj.customData?.label || selectedObj.type}
           </span>
           <button onClick={() => rotateSelected(-15)} style={{
-            padding: '4px 8px', background: '#1a1a1a',
+            padding: '4px 7px', background: '#1a1a1a',
             border: '1px solid #333', borderRadius: 6,
             color: '#fff', fontSize: 11, cursor: 'pointer',
           }}>↺ -15°</button>
           <button onClick={() => rotateSelected(15)} style={{
-            padding: '4px 8px', background: '#1a1a1a',
+            padding: '4px 7px', background: '#1a1a1a',
             border: '1px solid #333', borderRadius: 6,
             color: '#fff', fontSize: 11, cursor: 'pointer',
           }}>↻ +15°</button>
           <button onClick={flipSelected} style={{
-            padding: '4px 8px', background: '#1a1a1a',
+            padding: '4px 7px', background: '#1a1a1a',
             border: '1px solid #333', borderRadius: 6,
             color: '#fff', fontSize: 11, cursor: 'pointer',
-          }}>↔ Flip</button>
+          }}>↔</button>
           <button onClick={() => {
             fabricRef.current?.bringObjectForward(selectedObj);
             fabricRef.current?.renderAll();
           }} style={{
-            padding: '4px 8px', background: '#1a1a1a',
+            padding: '4px 7px', background: '#1a1a1a',
             border: '1px solid #333', borderRadius: 6,
             color: '#fff', fontSize: 11, cursor: 'pointer',
           }}>↑</button>
@@ -601,12 +623,12 @@ export default function CollageEditor({
             fabricRef.current?.sendObjectBackwards(selectedObj);
             fabricRef.current?.renderAll();
           }} style={{
-            padding: '4px 8px', background: '#1a1a1a',
+            padding: '4px 7px', background: '#1a1a1a',
             border: '1px solid #333', borderRadius: 6,
             color: '#fff', fontSize: 11, cursor: 'pointer',
           }}>↓</button>
           <button onClick={deleteSelected} style={{
-            padding: '4px 8px', background: '#2a0a0a',
+            padding: '4px 7px', background: '#2a0a0a',
             border: '1px solid #A32D2D', borderRadius: 6,
             color: '#ff6b6b', fontSize: 11, cursor: 'pointer',
           }}>🗑</button>
@@ -620,22 +642,22 @@ export default function CollageEditor({
             setActiveSlot(i);
             if (!slots[i].photoUrl) fileInputRef.current?.click();
           }} style={{
-            width: 32, height: 32, borderRadius: 6,
+            width: 30, height: 30, borderRadius: 6,
             border: activeSlot === i ? '2px solid #4ADE80' : '1px solid #333',
             background: activeSlot === i
               ? '#0d1f0d' : slots[i].photoUrl ? '#1a2a1a' : '#1a1a1a',
             color: activeSlot === i ? '#4ADE80' : '#666',
-            fontSize: 11, cursor: 'pointer',
+            fontSize: 10, cursor: 'pointer',
           }}>
             {slots[i].photoUrl ? '✓' : i + 1}
           </button>
         ))}
         <button onClick={() => fileInputRef.current?.click()} style={{
-          flex: 1, padding: '4px 8px', background: '#4ADE80', color: '#000',
-          border: 'none', borderRadius: 6, fontSize: 11,
+          flex: 1, padding: '4px 6px', background: '#4ADE80', color: '#000',
+          border: 'none', borderRadius: 6, fontSize: 10,
           fontWeight: 700, cursor: 'pointer',
         }}>
-          + Add to slot {activeSlot + 1}
+          + Slot {activeSlot + 1}
         </button>
       </div>
 
@@ -655,8 +677,8 @@ export default function CollageEditor({
         {activePanel === 'photos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p style={{ fontSize: 12, color: '#888', margin: 0, lineHeight: 1.6 }}>
-              Tap a slot on the canvas or the numbered buttons to add photos.
-              Active slot: <strong style={{ color: '#4ADE80' }}>{activeSlot + 1}</strong>
+              Tap a slot on the canvas or numbered buttons to add photos.
+              Active: <strong style={{ color: '#4ADE80' }}>slot {activeSlot + 1}</strong>
             </p>
             <p style={{ fontSize: 11, color: '#666', margin: '4px 0 0' }}>
               QR memory code placement
@@ -668,7 +690,7 @@ export default function CollageEditor({
               { id: 'back_label',   label: 'Back label only'                   },
             ].map(p => (
               <div key={p.id} onClick={() => setQrPlacement(p.id)} style={{
-                padding: '8px 10px', borderRadius: 7, cursor: 'pointer',
+                padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
                 border: qrPlacement === p.id ? '1px solid #4ADE80' : '1px solid #333',
                 background: qrPlacement === p.id ? '#0d1f0d' : 'transparent',
                 display: 'flex', justifyContent: 'space-between', fontSize: 12,
@@ -709,7 +731,7 @@ export default function CollageEditor({
                 <button key={f.name}
                   onClick={() => updateSlot('filter', f.css)}
                   style={{
-                    padding: '6px 4px',
+                    padding: '5px 3px',
                     border: slots[activeSlot]?.filter === f.css
                       ? '1px solid #4ADE80' : '1px solid #333',
                     borderRadius: 6,
@@ -724,9 +746,9 @@ export default function CollageEditor({
               ))}
             </div>
             <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>
-              Apply same filter to all slots
+              Apply to all slots
             </p>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
               {FILTERS.map(f => (
                 <button key={f.name}
                   onClick={() => {
@@ -734,7 +756,7 @@ export default function CollageEditor({
                     setSlots(prev => prev.map(s => ({ ...s, filter: f.css })));
                   }}
                   style={{
-                    padding: '4px 8px', borderRadius: 16,
+                    padding: '3px 7px', borderRadius: 16,
                     border: globalFilter === f.css
                       ? '1px solid #4ADE80' : '1px solid #333',
                     background: 'transparent',
@@ -744,15 +766,13 @@ export default function CollageEditor({
                 </button>
               ))}
             </div>
-            <div style={{ marginTop: 12 }}>
-              <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>
-                Zoom slot {activeSlot + 1}: {Math.round((slots[activeSlot]?.zoom || 1) * 100)}%
-              </p>
-              <input type="range" min={100} max={200}
-                value={Math.round((slots[activeSlot]?.zoom || 1) * 100)}
-                onChange={e => updateSlot('zoom', Number(e.target.value) / 100)}
-                style={{ width: '100%', accentColor: '#4ADE80' }} />
-            </div>
+            <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>
+              Zoom slot {activeSlot + 1}: {Math.round((slots[activeSlot]?.zoom || 1) * 100)}%
+            </p>
+            <input type="range" min={100} max={200}
+              value={Math.round((slots[activeSlot]?.zoom || 1) * 100)}
+              onChange={e => updateSlot('zoom', Number(e.target.value) / 100)}
+              style={{ width: '100%', accentColor: '#4ADE80' }} />
           </div>
         )}
 
@@ -787,7 +807,7 @@ export default function CollageEditor({
                 <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>
                   Size: {textSize}px
                 </p>
-                <input type="range" min={10} max={48} value={textSize}
+                <input type="range" min={8} max={40} value={textSize}
                   onChange={e => setTextSize(Number(e.target.value))}
                   style={{ width: '100%', accentColor: '#4ADE80' }} />
               </div>
@@ -795,7 +815,7 @@ export default function CollageEditor({
                 <p style={{ fontSize: 11, color: '#666', margin: '0 0 4px' }}>Color</p>
                 <input type="color" value={textColor}
                   onChange={e => setTextColor(e.target.value)}
-                  style={{ width: 36, height: 28, border: 'none',
+                  style={{ width: 34, height: 26, border: 'none',
                            background: 'none', cursor: 'pointer' }} />
               </div>
             </div>
@@ -819,9 +839,9 @@ export default function CollageEditor({
             }}>
               {CLIP_ART.map(e => (
                 <button key={e} onClick={() => addEmoji(e)} style={{
-                  padding: '8px 4px', borderRadius: 8,
+                  padding: '7px 3px', borderRadius: 8,
                   border: '1px solid #333', background: '#1a1a1a',
-                  cursor: 'pointer', textAlign: 'center', fontSize: 20,
+                  cursor: 'pointer', textAlign: 'center', fontSize: 18,
                 }}>{e}</button>
               ))}
             </div>

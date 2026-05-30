@@ -193,6 +193,260 @@ const C = {
   blueBdr: '#bfdbfe',
 };
 
+function StaffAssignModal({
+  events, contractors, staffRoster, onAssign, onRemove, onConfirm,
+}: {
+  events:       Event[];
+  contractors:  any[];
+  staffRoster:  any[];
+  onAssign:     (payload: any) => Promise<void>;
+  onRemove:     (staffId: string) => Promise<void>;
+  onConfirm:    (staffId: string, confirmed: boolean) => Promise<void>;
+}) {
+  const [open,          setOpen]          = useState(false);
+  const [eventId,       setEventId]       = useState('');
+  const [contractorId,  setContractorId]  = useState('');
+  const [roleName,      setRoleName]      = useState('');
+  const [callTime,      setCallTime]      = useState('');
+  const [startTime,     setStartTime]     = useState('');
+  const [endTime,       setEndTime]       = useState('');
+  const [hourlyRate,    setHourlyRate]    = useState('');
+  const [notes,         setNotes]         = useState('');
+  const [saving,        setSaving]        = useState(false);
+
+  const ROLES = [
+    'Site Manager','Tent Manager','Rover','Design Assistant',
+    'Tech Support','Order Picker','Hand-off Associate',
+  ];
+
+  const inp = {
+    width:'100%', padding:'8px 10px',
+    background:C.surface, border:`1px solid ${C.border}`,
+    borderRadius:6, color:C.text, fontSize:13,
+    outline:'none', boxSizing:'border-box' as const,
+  };
+
+  const sel = { ...inp, appearance:'none' as const };
+
+  async function handleAssign() {
+    if (!eventId || !contractorId || !roleName) return;
+    setSaving(true);
+    await onAssign({
+      event_id:      eventId,
+      contractor_id: contractorId,
+      role_name:     roleName,
+      call_time:     callTime   || null,
+      start_time:    startTime  || null,
+      end_time:      endTime    || null,
+      hourly_rate:   hourlyRate ? parseFloat(hourlyRate) : null,
+      notes:         notes      || null,
+    });
+    setSaving(false);
+    setOpen(false);
+    setContractorId(''); setRoleName('');
+    setCallTime(''); setStartTime(''); setEndTime('');
+    setHourlyRate(''); setNotes('');
+  }
+
+  const filteredRoster = eventId
+    ? staffRoster.filter((s:any) => s.event_id === eventId)
+    : staffRoster;
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display:'flex', justifyContent:'space-between',
+                    alignItems:'center', marginBottom:10 }}>
+        {sectionLabel('Staff assignment')}
+        <button onClick={() => setOpen(!open)} style={{
+          padding:'6px 14px', background:C.green, color:'#fff',
+          border:'none', borderRadius:7, fontSize:12,
+          fontWeight:600, cursor:'pointer',
+        }}>
+          + Assign staff
+        </button>
+      </div>
+
+      {/* Assignment form */}
+      {open && (
+        <div style={{
+          background:C.surface, border:`1px solid ${C.border}`,
+          borderRadius:12, padding:'16px', marginBottom:12,
+        }}>
+          <p style={{ fontSize:13, fontWeight:600, margin:'0 0 12px' }}>
+            New staff assignment
+          </p>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr',
+                        gap:8, marginBottom:8 }}>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Event *</p>
+              <select style={sel} value={eventId}
+                onChange={e => setEventId(e.target.value)}>
+                <option value="">Select event…</option>
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Contractor *</p>
+              <select style={sel} value={contractorId}
+                onChange={e => setContractorId(e.target.value)}>
+                <option value="">Select contractor…</option>
+                {contractors.filter(c => c.is_active).map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.first_name} {c.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginBottom:8 }}>
+            <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Role *</p>
+            <select style={sel} value={roleName}
+              onChange={e => setRoleName(e.target.value)}>
+              <option value="">Select role…</option>
+              {ROLES.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr',
+                        gap:8, marginBottom:8 }}>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Call time</p>
+              <input style={inp} type="time" value={callTime}
+                onChange={e => setCallTime(e.target.value)} />
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Start</p>
+              <input style={inp} type="time" value={startTime}
+                onChange={e => setStartTime(e.target.value)} />
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>End</p>
+              <input style={inp} type="time" value={endTime}
+                onChange={e => setEndTime(e.target.value)} />
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Rate $/hr</p>
+              <input style={inp} type="number" placeholder="18"
+                value={hourlyRate}
+                onChange={e => setHourlyRate(e.target.value)} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom:10 }}>
+            <p style={{ fontSize:11, color:C.muted, margin:'0 0 4px' }}>Notes</p>
+            <input style={inp} placeholder="Any notes…"
+              value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={handleAssign}
+              disabled={!eventId||!contractorId||!roleName||saving}
+              style={{
+                flex:1, padding:'10px',
+                background: (!eventId||!contractorId||!roleName||saving)
+                  ? C.border : C.green,
+                color: (!eventId||!contractorId||!roleName||saving)
+                  ? C.faint : '#fff',
+                border:'none', borderRadius:8,
+                fontSize:13, fontWeight:600, cursor:'pointer',
+              }}>
+              {saving ? 'Saving…' : 'Assign →'}
+            </button>
+            <button onClick={() => setOpen(false)} style={{
+              padding:'10px 16px', background:C.surface,
+              border:`1px solid ${C.border}`, borderRadius:8,
+              color:C.muted, fontSize:13, cursor:'pointer',
+            }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Event filter */}
+      {staffRoster.length > 0 && (
+        <div style={{ marginBottom:8 }}>
+          <select style={{ ...inp, width:'auto', minWidth:200 }}
+            value={eventId} onChange={e => setEventId(e.target.value)}>
+            <option value="">All events</option>
+            {events.map(ev => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Current roster */}
+      {filteredRoster.length === 0 ? (
+        <div style={{
+          background:C.surface, border:`1px solid ${C.border}`,
+          borderRadius:10, padding:'20px', textAlign:'center',
+        }}>
+          <p style={{ color:C.faint, fontSize:13, margin:0 }}>
+            No staff assigned yet. Click "+ Assign staff" to get started.
+          </p>
+        </div>
+      ) : filteredRoster.map((s:any) => (
+        <div key={s.id} style={{
+          background:C.surface, border:`1px solid ${C.border}`,
+          borderRadius:10, padding:'12px 14px', marginBottom:6,
+          display:'flex', justifyContent:'space-between',
+          alignItems:'center', gap:10, flexWrap:'wrap',
+        }}>
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            <div style={{
+              width:10, height:10, borderRadius:'50%',
+              background:s.role_color||C.green, flexShrink:0,
+            }}/>
+            <div>
+              <p style={{ fontWeight:600, fontSize:13,
+                          margin:'0 0 2px', color:C.text }}>
+                {s.first_name} {s.last_name}
+              </p>
+              <p style={{ fontSize:12, color:C.muted, margin:0 }}>
+                {s.role_name}
+                {s.call_time  ? ` · call ${s.call_time}`  : ''}
+                {s.start_time ? ` · ${s.start_time}–${s.end_time}` : ''}
+                {s.hourly_rate ? ` · $${s.hourly_rate}/hr` : ''}
+              </p>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {s.confirmed ? (
+              <button onClick={() => onConfirm(s.id, false)} style={{
+                padding:'4px 10px', background:C.greenBg,
+                border:`1px solid ${C.greenBdr}`, borderRadius:6,
+                color:C.green, fontSize:11, cursor:'pointer',
+              }}>✓ Confirmed</button>
+            ) : (
+              <button onClick={() => onConfirm(s.id, true)} style={{
+                padding:'4px 10px', background:C.surface,
+                border:`1px solid ${C.border}`, borderRadius:6,
+                color:C.muted, fontSize:11, cursor:'pointer',
+              }}>Confirm</button>
+            )}
+            <a href={`tel:${s.phone}`} style={{
+              padding:'4px 10px', background:C.surface,
+              border:`1px solid ${C.border}`, borderRadius:6,
+              color:C.text, fontSize:11, textDecoration:'none',
+            }}>📞</a>
+            <button onClick={() => onRemove(s.id)} style={{
+              padding:'4px 10px', background:C.surface,
+              border:`1px solid ${C.border}`, borderRadius:6,
+              color:C.red, fontSize:11, cursor:'pointer',
+            }}>Remove</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 export default function AdminClient({
   stats, recentOrders, creators, pendingApps,
   reorderAlerts, credits, events,
@@ -888,6 +1142,40 @@ export default function AdminClient({
                 ))}
               </div>
             )}
+
+            {/* Staff assignment */}
+            <StaffAssignModal
+              events={events}
+              contractors={contractors}
+              staffRoster={staffRoster}
+              onAssign={async (payload) => {
+                const res = await fetch('/api/admin/assign-staff', {
+                  method:  'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body:    JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (data.success) setMessage('✓ Staff assigned');
+                else setMessage(`Error: ${data.error}`);
+                setTimeout(() => setMessage(null), 3000);
+              }}
+              onRemove={async (staffId) => {
+                await fetch(`/api/admin/assign-staff?id=${staffId}`, {
+                  method: 'DELETE',
+                });
+                setMessage('✓ Staff removed');
+                setTimeout(() => setMessage(null), 2000);
+              }}
+              onConfirm={async (staffId, confirmed) => {
+                await fetch('/api/admin/assign-staff', {
+                  method:  'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body:    JSON.stringify({ id: staffId, confirmed }),
+                });
+                setMessage(confirmed ? '✓ Confirmed' : '✓ Unconfirmed');
+                setTimeout(() => setMessage(null), 2000);
+              }}
+            />
 
             {/* Contractor directory */}
             <div style={{ display:'flex', justifyContent:'space-between',

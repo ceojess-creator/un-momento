@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import SchoolSearch from '@/app/components/SchoolSearch';
+const [selectedSchool, setSelectedSchool] = useState<any>(null);
 
 const COUNTRIES = [
   'United States', 'Canada', 'United Kingdom', 'Australia',
@@ -28,6 +30,7 @@ export default function CreatorSignup() {
     first_name:           '',
     last_name:            '',
     institution_name:     '',
+    school_nces_id:       '',
     institution_country:  'United States',
     graduation_month:     5,
     program_or_grade:     '',
@@ -205,10 +208,19 @@ export default function CreatorSignup() {
 
           {/* Institution */}
           <div>
-            <p style={{ fontSize:11, color:'#666', margin:'0 0 5px' }}>School / institution name *</p>
-            <input style={inp} placeholder="Mater Dei High School"
-              value={form.institution_name}
-              onChange={e => set('institution_name', e.target.value)} />
+            <p style={{ fontSize:11, color:'#666', margin:'0 0 5px' }}>
+              School / institution name *
+            </p>
+            <SchoolSearch
+              darkMode={true}
+              required={true}
+              placeholder="Search for your school…"
+              onChange={(school) => {
+                setSelectedSchool(school);
+                set('institution_name', school?.name || '');
+                set('school_nces_id', school?.nces_id || '');
+              }}
+            />
           </div>
 
           {/* Country */}

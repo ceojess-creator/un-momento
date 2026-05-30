@@ -243,9 +243,7 @@ function StaffAssignModal({
     });
     setSaving(false);
     setOpen(false);
-    setContractorId(''); setRoleName('');
-    setCallTime(''); setStartTime(''); setEndTime('');
-    setHourlyRate(''); setNotes('');
+    window.location.reload();
   }
 
   const filteredRoster = eventId
@@ -1165,8 +1163,7 @@ export default function AdminClient({
                 await fetch(`/api/admin/assign-staff?id=${staffId}`, {
                   method: 'DELETE',
                 });
-                setMessage('✓ Staff removed');
-                setTimeout(() => setMessage(null), 2000);
+                window.location.reload();
               }}
               onConfirm={async (staffId, confirmed) => {
                 await fetch('/api/admin/assign-staff', {
@@ -1174,9 +1171,9 @@ export default function AdminClient({
                   headers: { 'Content-Type': 'application/json' },
                   body:    JSON.stringify({ id: staffId, confirmed }),
                 });
-                setMessage(confirmed ? '✓ Confirmed' : '✓ Unconfirmed');
-                setTimeout(() => setMessage(null), 2000);
+                window.location.reload();
               }}
+              
             />
 
             {/* Contractor directory */}

@@ -418,7 +418,7 @@ export default function GradEventPage() {
               background: fulfillment==='ship' ? '#0d1f0d' : '#111',
             }}>
               <p style={{ fontWeight:600, fontSize:15, margin:'0 0 4px' }}>📦 Ship to my door</p>
-              <p style={{ fontSize:13, color:'#888', margin:0 }}>Ships anywhere in the US in 4–5 business days via Gelato.</p>
+              <p style={{ fontSize:13, color:'#888', margin:0 }}>Ships anywhere in the US in 4–5 business days.</p>
             </div>
 
             {boothActive && (

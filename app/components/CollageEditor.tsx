@@ -145,8 +145,17 @@ export default function CollageEditor({
   const [ready,        setReady]        = useState(false);
   const [globalFilter, setGlobalFilter] = useState('none');
 
-  const PRINT_W = orientation === 'landscape' ? BASE_W : BASE_H;
-  const PRINT_H = orientation === 'landscape' ? BASE_H : BASE_W;
+  const PRINT_W = typeof window !== 'undefined' && (window as any).__collageW
+    ? (orientation === 'landscape'
+        ? (window as any).__collageW
+        : (window as any).__collageH)
+    : (orientation === 'landscape' ? BASE_W : BASE_H);
+
+  const PRINT_H = typeof window !== 'undefined' && (window as any).__collageW
+    ? (orientation === 'landscape'
+        ? (window as any).__collageW
+        : (window as any).__collageH)
+    : (orientation === 'landscape' ? BASE_H : BASE_W);  
 
   const template    = TEMPLATES.find(t => t.id === templateId)!;
   const totalSlots  = template.slots.length;
@@ -159,14 +168,22 @@ export default function CollageEditor({
       fabricMod.current = f;
       if (!canvasRef.current) return;
 
+      // Get the actual display width of the container
+      const container = canvasRef.current.parentElement;
+      const displayW  = container ? container.clientWidth : BASE_W;
+      const displayH  = Math.round(displayW * (BASE_H / BASE_W));
+      
+      // Set HTML canvas element size to match display
+      canvasRef.current.width  = displayW;  
+      canvasRef.current.height = displayH;
+
       fc = new f.Canvas(canvasRef.current, {
-        width:           BASE_W,
-        height:          BASE_H,
+        width:  displayW,
+        height: displayH,
         backgroundColor: '#111',
-        selection:       true,
+        selection: true,
       });
 
-      fabricRef.current = fc;
       setReady(true);
 
       fc.on('selection:created', (e: any) => setSelectedObj(e.selected?.[0] ?? null));
@@ -578,7 +595,7 @@ export default function CollageEditor({
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
-          style={{ width: '100%', display: 'block', cursor: 'pointer' }}
+          style={{ display: 'block', maxWidth: '100%' }}
         />
       </div>
 

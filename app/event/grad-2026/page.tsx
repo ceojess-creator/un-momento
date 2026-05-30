@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import CollageEditor  from '@/app/components/CollageEditor';
 import MemoryRecorder from '@/app/components/MediaRecorder';
 import StickerStudio  from '@/app/components/StickerStudio';
+import CreatorSearch  from '@/app/components/CreatorSearch';
 
 const BUNDLES = [
   {
@@ -50,7 +51,7 @@ const ADDONS = [
   { id: 'extra_sticker',   name: 'Extra Sticker Sheet',      price: 12 },
 ];
 
-type Step = 'bundle'|'media'|'design'|'sticker'|'button'|'fulfillment'|'details'|'review';
+type Step = 'bundle'|'creator'|'media'|'design'|'sticker'|'button'|'fulfillment'|'details'|'review';
 
 export default function GradEventPage() {
   const [step,         setStep]         = useState<Step>('bundle');
@@ -65,6 +66,8 @@ export default function GradEventPage() {
   const [fulfillment,  setFulfillment]  = useState<'ship'|'pickup'>('ship');
   const [boothActive,  setBoothActive]  = useState(false);
   const [loading,      setLoading]      = useState(false);
+  const [selectedCreator, setSelectedCreator] = useState<any>(null);
+  const [refParam,     setRefParam]     = useState<string>('');
   const [form,         setForm]         = useState({
     name:'', email:'', phone:'',
     address:'', city:'', state:'', zip:'',
@@ -79,19 +82,24 @@ export default function GradEventPage() {
   const total = (selectedBundle?.price || 0) + addonTotal;
 
   const STEPS: Step[] = [
-    'bundle','media','design',
+    'bundle','creator','media','design',
     ...(selectedBundle?.hasSticker ? ['sticker' as Step] : []),
     ...(selectedBundle?.hasButton  ? ['button'  as Step] : []),
     'fulfillment','details','review',
   ];
   const stepLabels = STEPS.map(s => ({
-    bundle:'Bundle', media:'Memory', design:'Design',
+    bundle:'Bundle', creator:'Supporting', media:'Memory', design:'Design',
     sticker:'Sticker', button:'Button', fulfillment:'Delivery',
     details:'Details', review:'Review',
   }[s]));
   const stepIndex = STEPS.indexOf(step);
 
   useEffect(() => {
+    // Read ?ref= param from URL
+    const params = new URLSearchParams(window.location.search);
+    const ref    = params.get('ref');
+    if (ref) setRefParam(ref);
+
     fetch('/api/event/booth-check?slug=grad-2026')
       .then(r => r.json())
       .then(d => setBoothActive(d.booth_active || false))
@@ -133,6 +141,8 @@ export default function GradEventPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bundle_id: bundle, addons, form, total,
+          creator_handle: selectedCreator?.handle || null,
+          referral_code:  selectedCreator?.handle || null,
           event_slug: 'grad-2026',
           fulfillment_type: fulfillment,
           media_url:    mediaUrl,
@@ -238,6 +248,35 @@ export default function GradEventPage() {
           </div>
         )}
 
+        {/* STEP: CREATOR SEARCH */}
+        {step==='creator' && (
+          <div>
+            <CreatorSearch
+              prefilledRef={refParam}
+              onSelect={(creator) => setSelectedCreator(creator)}
+              onSkip={() => {
+                setSelectedCreator(null);
+                nextStep('creator');
+              }}
+            />
+            {selectedCreator && (
+              <button onClick={() => nextStep('creator')} style={{
+                width:'100%', marginTop:12, padding:14,
+                background:'#4ADE80', color:'#000', border:'none',
+                borderRadius:10, fontSize:15, fontWeight:700, cursor:'pointer',
+              }}>
+                Continue →
+              </button>
+            )}
+            <button onClick={() => prevStep('creator')} style={{
+              width:'100%', marginTop:8, padding:10,
+              border:'1px solid #333', borderRadius:10,
+              background:'transparent', color:'#666',
+              fontSize:13, cursor:'pointer',
+            }}>← Back</button>
+          </div>
+        )}
+        
         {/* STEP: MEDIA */}
         {step==='media' && (
           <div>
@@ -443,6 +482,7 @@ export default function GradEventPage() {
               {[
                 ['Bundle',    `${selectedBundle.name} — $${selectedBundle.price}`],
                 ...addons.map(id => { const a=ADDONS.find(x=>x.id===id); return [a?.name||'',`+$${a?.price}`]; }),
+                ['Supporting',   selectedCreator ? `${selectedCreator.display_name} · ${selectedCreator.school_name}` : 'General fund'],
                 ['Memory clip',  mediaFile  ? `✓ ${mediaType} recorded`    : 'Not recorded'],
                 ['Photo design', editorState ? '✓ Designed'                : 'Not designed'],
                 ['Sticker sheet',stickerData ? '✓ Designed'                : selectedBundle.hasSticker ? 'Not designed' : 'Not included'],

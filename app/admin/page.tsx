@@ -45,7 +45,7 @@ export default async function AdminPage() {
     supabase.from('reorder_alerts').select('*'),
     supabase.from('referral_credits').select('amount,referrer_handle,created_at').order('created_at',{ascending:false}).limit(50),
     supabase.from('event_pages').select('*').order('event_date',{ascending:false}).limit(20),
-    supabase.from('event_hardware').select('*, event_pages!event_hardware_event_id_fkey(name, slug)').order('device_type', { ascending: true }),
+    supabase.from('event_hardware').select('*').order('device_type', { ascending: true }),
     supabase.from('assembly_queue').select('*').limit(50),
     supabase.from('active_print_queue').select('*').limit(50),
     supabase.from('event_staff_roster').select('*').limit(100),
@@ -57,6 +57,13 @@ export default async function AdminPage() {
   const onlineRevenue = (allOrders||[]).filter(o=>o.fulfillment_source==='online').reduce((s,o)=>s+(o.tokens_spent||0),0);
   const onsiteRevenue = (allOrders||[]).filter(o=>o.fulfillment_source==='onsite').reduce((s,o)=>s+(o.tokens_spent||0),0);
   const totalDonated  = (credits||[]).reduce((s,c)=>s+(c.amount||0),0);
+  
+  // Enrich hardware with event names
+  const eventMap = Object.fromEntries((events||[]).map(e => [e.id, e]));
+  const enrichedHardware = (hardware||[]).map(h => ({
+    ...h,
+    event_pages: eventMap[(h as any).event_id] || null,
+  }));
 
   return (
     <AdminClient
@@ -77,7 +84,7 @@ export default async function AdminPage() {
       reorderAlerts={reorderAlerts||[]}
       credits={credits            ||[]}
       events={events              ||[]}
-      hardware={hardware          ||[]}
+      hardware={enrichedHardware}
       assemblyQueue={assemblyQueue||[]}
       printQueue={printQueue      ||[]}
       staffRoster={staffRoster    ||[]}

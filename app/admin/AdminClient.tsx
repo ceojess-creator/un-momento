@@ -95,8 +95,7 @@ interface Hardware {
   capacity_pct:      number;
   status:            string;
   last_seen:         string;
-  deployed_at_event: string;
-  event_slug:        string;
+  event_pages?:      { name: string; slug: string } | null;
 }
 interface AssemblyItem {
   id:                string;
@@ -740,9 +739,9 @@ export default function AdminClient({
                         </div>
                       </div>
                     )}
-                    {h.deployed_at_event&&(
+                    {(h as any).event_pages?.name&&(
                       <p style={{fontSize:10,color:C.faint,margin:'6px 0 0'}}>
-                        📍 {h.deployed_at_event}
+                        📍 {(h as any).event_pages.name}
                       </p>
                     )}
                   </div>

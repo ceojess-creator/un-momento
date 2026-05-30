@@ -17,10 +17,10 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
     .eq('handle', handle)
     .single();
 
-  if (!data) return { title: 'Un Momento Prints' };
+  if (!data) return { title: 'Un Momento' };
 
   return {
-    title: `${data.display_name} — Un Momento Prints`,
+    title: `${data.display_name} — Un Momento`,
     description: `Order graduation prints and keepsakes from ${data.display_name}. Ships anywhere in the US.`,
   };
 }

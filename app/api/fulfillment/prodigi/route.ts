@@ -130,7 +130,7 @@ export async function POST(request: Request) {
           'Content-Type':  'application/json',
         },
         body: JSON.stringify({
-          from:    'Un Momento Prints <orders@unmomentoprints.com>',
+          from:    'Un Momento <orders@unmomentoprints.com>',
           to:      recipient_email,
           subject: 'Your Un Momento print is on its way! 🎓',
           html: `
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
               <a href="mailto:ceojess@unmomentoprints.com">ceojess@unmomentoprints.com</a></p>
               <hr/>
               <p style="color: #94a3b8; font-size: 12px;">
-                Un Momento Prints · The moments that matter most deserve to exist in the real world.
+                Un Momento · The moments that matter most deserve to exist in the real world.
               </p>
             </div>
           `,

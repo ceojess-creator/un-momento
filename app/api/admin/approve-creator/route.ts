@@ -98,11 +98,11 @@ export async function POST(request: Request) {
             'Content-Type':  'application/json',
           },
           body: JSON.stringify({
-            from:    'Un Momento Prints <memories@unmomentoprints.com>',
+            from:    'Un Momento <memories@unmomentoprints.com>',
             to:      contactEmail,
             subject: `You're approved! Your Un Momento storefront is live`,
             html: `
-              <h2>Welcome to Un Momento Prints, ${app.first_name}!</h2>
+              <h2>Welcome to Un Momento, ${app.first_name}!</h2>
               <p>Your creator application has been approved.</p>
               <p><strong>Your storefront:</strong>
                 <a href="https://unmomentoprints.com/${handle}">

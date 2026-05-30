@@ -154,7 +154,7 @@ export default function EventsPage() {
           </h1>
           <p style={{ color: '#888', fontSize: 14, lineHeight: 1.7,
                       margin: '0 0 24px' }}>
-            Thank you for your interest in Un Momento Prints for your{' '}
+            Thank you for your interest in Un Momento for your{' '}
             {selectedEventType?.name.toLowerCase()}. We'll reach out within
             24 hours to confirm availability and details.
           </p>
@@ -190,7 +190,7 @@ export default function EventsPage() {
         <p style={{ fontSize: 11, color: '#4ADE80', letterSpacing: 5,
                     textTransform: 'uppercase', margin: '0 0 16px',
                     fontWeight: 500 }}>
-          Un Momento Prints
+          Un Momento
         </p>
         <h1 style={{
           fontSize: 'clamp(28px, 6vw, 52px)', fontWeight: 500,

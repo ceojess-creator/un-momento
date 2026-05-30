@@ -124,7 +124,7 @@ export default function AccountClient({
         <div>
           <p style={{ fontSize: 11, color: C.faint, letterSpacing: 3,
                       textTransform: 'uppercase', margin: '0 0 3px' }}>
-            Un Momento Prints
+            Un Momento
           </p>
           <h1 style={{ fontSize: 17, fontWeight: 500, margin: 0 }}>
             {account.name || account.email}

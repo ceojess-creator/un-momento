@@ -88,7 +88,7 @@ export async function POST(request: Request) {
           'Content-Type':  'application/json',
         },
         body: JSON.stringify({
-          from:    'Un Momento Prints <orders@unmomentoprints.com>',
+          from:    'Un Momento <orders@unmomentoprints.com>',
           to:      'ceojess@unmomentoprints.com',
           subject: `New event booking inquiry — ${event_type} · ${venue_city}, ${venue_state} · ${event_date}`,
           html: `
@@ -121,9 +121,9 @@ export async function POST(request: Request) {
           'Content-Type':  'application/json',
         },
         body: JSON.stringify({
-          from:    'Un Momento Prints <orders@unmomentoprints.com>',
+          from:    'Un Momento <orders@unmomentoprints.com>',
           to:      email,
-          subject: `We received your booking request — Un Momento Prints`,
+          subject: `We received your booking request — Un Momento`,
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
               <h2>Thanks for reaching out, ${name.split(' ')[0]}!</h2>
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
               <p>Questions? Reply to this email or call/text
               <a href="tel:+12623885790">(262) 388-5790</a></p>
               <p style="color:#94a3b8;font-size:12px;">
-                Un Momento Prints ·
+                Un Momento ·
                 The moments that matter most deserve to exist in the real world.
               </p>
             </div>

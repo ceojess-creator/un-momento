@@ -15,7 +15,7 @@ export default function SignInPage() {
         <p style={{ fontSize: 11, color: '#4ADE80', letterSpacing: 5,
                     textTransform: 'uppercase', margin: '0 0 8px',
                     fontWeight: 500 }}>
-          Un Momento Prints
+          Un Momento
         </p>
         <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', margin: 0 }}>
           Sign in

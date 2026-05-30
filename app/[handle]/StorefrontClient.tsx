@@ -168,7 +168,7 @@ export default function StorefrontClient({
       }}>
         <p style={{ fontSize: 11, color: '#555', letterSpacing: 4,
                     textTransform: 'uppercase', margin: '0 0 10px' }}>
-          Un Momento Prints
+          Un Momento
         </p>
 
         {profile.avatar_url && (
@@ -548,7 +548,7 @@ export default function StorefrontClient({
             Powered by{' '}
             <a href="https://unmomentoprints.com"
                style={{ color: '#555', textDecoration: 'none' }}>
-              Un Momento Prints
+              Un Momento
             </a>
             {' '}· Ships anywhere in the US · 10% to school
           </p>

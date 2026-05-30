@@ -583,7 +583,7 @@ export default function Home() {
         textAlign: 'center',
       }}>
         <p style={{ fontSize: 13, color: '#555', margin: '0 0 12px' }}>
-          Un Momento Prints · California · Wisconsin · Ships nationwide
+          Un Momento LLC · Ships nationwide
         </p>
         <p style={{ fontSize: 12, color: '#444', margin: '0 0 16px' }}>
           <a href="/event/grad-2026"    style={{ color:'#666', textDecoration:'none', marginRight:16 }}>Order</a>

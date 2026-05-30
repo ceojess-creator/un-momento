@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SchoolSearch from '@/app/components/SchoolSearch';
-const [selectedSchool, setSelectedSchool] = useState<any>(null);
 
 const COUNTRIES = [
   'United States', 'Canada', 'United Kingdom', 'Australia',
@@ -41,6 +40,8 @@ export default function CreatorSignup() {
     phone:                '',
     attestation:          false,
   });
+  
+  const [selectedSchool, setSelectedSchool] = useState<any>(null);
 
   function set(k: string, v: any) {
     setForm(f => ({ ...f, [k]: v }));

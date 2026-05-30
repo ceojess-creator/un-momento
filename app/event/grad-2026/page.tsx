@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import SmartEditor             from '@/app/components/SmartEditor';
 import MemoryRecorder          from '@/app/components/MediaRecorder';
+import CollageEditor           from '@/app/components/CollageEditor';
 
 const BUNDLES = [
   {
@@ -306,20 +307,19 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP 3 — Smart editor */}
+        {/* STEP 3 — Design */}
         {step === 'design' && (
           <div>
             <p style={{ fontSize: 13, color: '#888',
                         margin: '0 0 16px', lineHeight: 1.6 }}>
-              Upload your photo and design your print.
-              What you see is exactly what gets printed.
+              Design your 4×6 photo print. Add up to 6 photos,
+              text overlays, and choose your QR placement.
             </p>
-            <SmartEditor
-              showSticker={selectedBundle?.hasSticker || false}
-              defaultGradName=""
-              onComplete={(state, file) => {
-                setEditorState(state);
-                setPhotoFile(file);
+            <CollageEditor
+              defaultGradName={form.grad_name}
+              defaultSchool={form.school}
+              onComplete={(dataUrl, slots) => {
+                setEditorState({ dataUrl, slots });
                 setStep('fulfillment');
               }}
             />

@@ -197,6 +197,12 @@ export default function Home() {
               }}>
                 Order now →
               </a>
+              <a href="/events" style={{
+                 padding: '14px 28px', border: '1px solid rgba(255,255,255,0.2)',
+                 color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 15,
+                }}>
+                 Book an event
+               </a>
             </div>
           </div>
         </div>

@@ -32,19 +32,30 @@ export default function Home() {
 
 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
                     justifyContent: 'center', marginBottom: 48 }}>
-        <a href="/event/grad-2026"
-           style={{ padding: '14px 28px', background: '#ffffff', color: '#0a0a0a',
-                    borderRadius: 8, textDecoration: 'none', fontWeight: 600,
-                    fontSize: 15 }}>
-          Order now →
-        </a>
-        <a href="mailto:ceojess@unmomentoprints.com"
-           style={{ padding: '14px 28px', border: '1px solid #444', color: '#ffffff',
-                    borderRadius: 8, textDecoration: 'none', fontWeight: 500,
-                    fontSize: 15 }}>
-          Book an event
-        </a>
-      </div>
+        <<div style={{ display:'flex', gap:10, flexWrap:'wrap',
+                      justifyContent:'center', marginBottom:64 }}>
+          <a href="/event/grad-2026" style={{
+            padding: '14px 28px', background: '#fff', color: '#000',
+            borderRadius: 10, textDecoration: 'none',
+            fontWeight: 700, fontSize: 15,
+          }}>
+            Order now →
+          </a>
+          <a href="/events" style={{
+            padding: '14px 28px', border: '1px solid rgba(255,255,255,0.2)',
+            color: '#fff', borderRadius: 10, textDecoration: 'none',
+            fontSize: 15,
+          }}>
+            Book an event
+          </a>
+          <a href="/creator/signup" style={{
+            padding: '14px 28px', border: '1px solid rgba(255,255,255,0.2)',
+            color: '#fff', borderRadius: 10, textDecoration: 'none',
+            fontSize: 15,
+          }}>
+            Become a creator
+          </a>
+        </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: 24, maxWidth: 800, width: '100%', marginBottom: 48 }}>

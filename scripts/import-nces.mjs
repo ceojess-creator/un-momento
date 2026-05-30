@@ -336,10 +336,14 @@ async function importHighSchoolsCCD() {
             school.school_level === 4 ? 'other' :
             'other';
 
+          const actualState = school.state_location || school.state_mailing || stateAbbr;
           batch.push({
             nces_id:       `ccd-${school.ncessch}`,
             name:          school.school_name,
             type:          schoolType,
+            city:          school.city_location || school.city_mailing || '',
+            state_abbr:    actualState,
+            state:         actualState,
           });
 
           stateCount++;

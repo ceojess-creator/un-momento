@@ -10,7 +10,6 @@ const supabase = createClient(
 
 export default async function AccountPage() {
   const user = await currentUser();
-
   if (!user) redirect('/sign-in');
 
   const email = user.emailAddresses?.[0]?.emailAddress || '';
@@ -43,12 +42,27 @@ export default async function AccountPage() {
     .select('*')
     .eq('buyer_email', email)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(20);
+
+  // Get referral credits if creator
+  const creatorHandle = account?.creator_profiles?.handle;
+  let referralCredits: any[] = [];
+
+  if (creatorHandle) {
+    const { data: credits } = await supabase
+      .from('referral_credits')
+      .select('*')
+      .eq('referrer_handle', creatorHandle)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    referralCredits = credits || [];
+  }
 
   return (
     <AccountClient
       account={account}
-      orders={orders || []}
+      orders={orders          || []}
+      referralCredits={referralCredits}
       userImage={user.imageUrl}
     />
   );

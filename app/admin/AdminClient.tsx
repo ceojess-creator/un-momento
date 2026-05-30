@@ -890,7 +890,17 @@ export default function AdminClient({
             )}
 
             {/* Contractor directory */}
-            {sectionLabel('Contractor directory')}
+            <div style={{ display:'flex', justifyContent:'space-between',
+                          alignItems:'center', marginBottom:10 }}>
+              <p style={{ fontSize:11, fontWeight:600, color:C.muted,
+                          letterSpacing:1, textTransform:'uppercase',
+                          margin:0 }}>Contractor directory</p>
+              <a href="/admin/contractors" style={{
+                padding:'6px 14px', background:C.green, color:'#fff',
+                borderRadius:7, textDecoration:'none',
+                fontSize:12, fontWeight:600,
+              }}>+ Add contractor</a>
+            </div>
             {contractors.length===0?(
               <p style={{color:C.faint,fontSize:13}}>
                 No contractors on file yet. Add them in Supabase → contractors table.

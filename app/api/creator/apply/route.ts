@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       first_name, last_name, institution_name,
-      institution_country, graduation_date,
+      school_nces_id, institution_country, graduation_date,
       program_or_grade, edu_email, parent_email,
       social_link, referred_by, phone, attestation,
     } = body;
@@ -153,6 +153,17 @@ export async function POST(request: Request) {
     // Generate handle
     const handle = await generateHandle(first_name, last_name);
 
+    // Look up school_id from nces_id
+    let schoolId = null;
+    if (school_nces_id) {
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('id')
+        .eq('nces_id', school_nces_id)
+        .single();
+      schoolId = schoolData?.id || null;
+    }
+    
     // Create creator profile if approved
     if (status === 'approved') {
       const { error: profileError } = await supabase
@@ -161,7 +172,7 @@ export async function POST(request: Request) {
           account_id:          accountId,
           handle,
           display_name:        `${first_name} ${last_name}`,
-          school_name:         institution_name,
+          school_id:           schoolId,
           institution_country,
           graduation_year:     2026,
           verification_level:  verificationLevel,

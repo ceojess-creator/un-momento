@@ -9,10 +9,10 @@ const supabase = createClient(
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const query  = searchParams.get('q')           || '';
-    const school = searchParams.get('school')      || '';
-    const year   = searchParams.get('year')        || '';
-    const handle = searchParams.get('handle')      || '';
+    const query  = searchParams.get('q')      || '';
+    const school = searchParams.get('school') || '';
+    const year   = searchParams.get('year')   || '';
+    const handle = searchParams.get('handle') || '';
 
     if (!query && !handle) {
       return NextResponse.json({ creators: [] });
@@ -22,37 +22,55 @@ export async function GET(request: Request) {
     if (handle) {
       const { data } = await supabase
         .from('creator_profiles')
-        .select('handle, display_name, school_name, graduation_year, total_donated, avatar_url, is_verified')
+        .select('handle, display_name, graduation_year, total_donated, avatar_url, is_verified, schools(name, city, state_abbr)')
         .eq('handle', handle)
         .eq('is_active', true)
         .single();
 
-      return NextResponse.json({ creators: data ? [data] : [] });
+      if (!data) return NextResponse.json({ creators: [] });
+
+      return NextResponse.json({
+        creators: [{
+          ...data,
+          school_name: (data as any).schools?.name || '',
+        }],
+      });
     }
 
-    // Build search query
+    // Search query
     let q = supabase
       .from('creator_profiles')
-      .select('handle, display_name, school_name, graduation_year, total_donated, avatar_url, is_verified')
+      .select('handle, display_name, graduation_year, total_donated, avatar_url, is_verified, schools(name, city, state_abbr)')
       .eq('is_active', true)
       .or(`display_name.ilike.%${query}%,handle.ilike.%${query}%`);
 
-    if (school) q = q.ilike('school_name', `%${school}%`);
-    if (year)   q = q.eq('graduation_year', parseInt(year));
+    if (year) q = q.eq('graduation_year', parseInt(year));
 
     const { data, error } = await q
       .order('total_donated', { ascending: false })
       .limit(20);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[creator search] query error:', error.message);
+      return NextResponse.json({ creators: [] });
+    }
 
-    return NextResponse.json({ creators: data || [] });
+    const creators = (data || []).map((c: any) => ({
+      ...c,
+      school_name: c.schools?.name     || '',
+      school_city: c.schools?.city     || '',
+      school_state:c.schools?.state_abbr || '',
+    }));
+
+    // Filter by school name if provided
+    const filtered = school
+      ? creators.filter(c => c.school_name.toLowerCase().includes(school.toLowerCase()))
+      : creators;
+
+    return NextResponse.json({ creators: filtered });
 
   } catch (err: any) {
     console.error('[creator search]', err.message);
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

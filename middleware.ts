@@ -10,6 +10,7 @@ const isProtectedRoute = createRouteMatcher([
 const isPublicApiRoute = createRouteMatcher([
   '/api/schools/(.*)',
   '/api/creator/search(.*)',
+  '/api/creator/enroll(.*)',
   '/api/fundraiser/(.*)',
   '/api/event/(.*)',
   '/api/checkout(.*)',
@@ -18,6 +19,8 @@ const isPublicApiRoute = createRouteMatcher([
   '/api/notify/(.*)',
   '/api/fulfillment/(.*)',
   '/api/remove-bg(.*)',
+  '/api/booking(.*)',
+  '/api/picker/(.*)',
 ]);
 
 export default clerkMiddleware((auth, req) => {

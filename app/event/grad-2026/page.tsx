@@ -1,8 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import SmartEditor             from '@/app/components/SmartEditor';
-import MemoryRecorder          from '@/app/components/MediaRecorder';
-import CollageEditor           from '@/app/components/CollageEditor';
+import CollageEditor from '@/app/components/CollageEditor';
+import MemoryRecorder from '@/app/components/MediaRecorder';
 
 const BUNDLES = [
   {
@@ -55,13 +54,13 @@ export default function GradEventPage() {
   const [mediaFile,   setMediaFile]   = useState<File | null>(null);
   const [mediaType,   setMediaType]   = useState<'video'|'audio'|null>(null);
   const [editorState, setEditorState] = useState<any>(null);
-  const [photoFile,   setPhotoFile]   = useState<File | null>(null);
   const [fulfillment, setFulfillment] = useState<'ship'|'pickup'>('ship');
   const [boothActive, setBoothActive] = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [form,        setForm]        = useState({
     name: '', email: '', phone: '',
     address: '', city: '', state: '', zip: '',
+    grad_name: '', school: '',
   });
 
   const selectedBundle = BUNDLES.find(b => b.id === bundle);
@@ -71,7 +70,6 @@ export default function GradEventPage() {
   }, 0);
   const total = (selectedBundle?.price || 0) + addonTotal;
 
-  // Check if a booth is active for today
   useEffect(() => {
     fetch('/api/event/booth-check?slug=grad-2026')
       .then(r => r.json())
@@ -85,14 +83,13 @@ export default function GradEventPage() {
     );
   }
 
-  function set(k: string, v: string) {
+  function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }));
   }
 
   async function handleCheckout() {
     setLoading(true);
     try {
-      // Upload media if provided
       let mediaUrl = null;
       if (mediaFile) {
         const fd = new FormData();
@@ -103,31 +100,19 @@ export default function GradEventPage() {
         mediaUrl   = data.url;
       }
 
-      // Upload photo if provided
-      let photoUrl = null;
-      if (photoFile) {
-        const fd = new FormData();
-        fd.append('file', photoFile);
-        fd.append('folder', 'print-photos');
-        const res  = await fetch('/api/upload', { method: 'POST', body: fd });
-        const data = await res.json();
-        photoUrl   = data.url;
-      }
-
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bundle_id:    bundle,
+          bundle_id:        bundle,
           addons,
           form,
           total,
-          event_slug:   'grad-2026',
+          event_slug:       'grad-2026',
           fulfillment_type: fulfillment,
-          media_url:    mediaUrl,
-          media_type:   mediaType,
-          photo_url:    photoUrl,
-          editor_state: editorState,
+          media_url:        mediaUrl,
+          media_type:       mediaType,
+          editor_state:     editorState,
         }),
       });
       const data = await res.json();
@@ -145,7 +130,8 @@ export default function GradEventPage() {
   };
 
   const STEPS: Step[] = ['bundle','media','design','fulfillment','details','review'];
-  const stepIndex      = STEPS.indexOf(step);
+  const stepIndex = STEPS.indexOf(step);
+  const stepLabels = ['Bundle','Memory','Design','Delivery','Details','Review'];
 
   return (
     <main style={{
@@ -171,23 +157,19 @@ export default function GradEventPage() {
 
         {/* Step progress */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
-          {['Bundle','Memory','Design','Delivery','Details','Review'].map(
-            (s, i) => (
-              <div key={s} style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{
-                  height: 4, borderRadius: 2, marginBottom: 4,
-                  background: i < stepIndex
-                    ? '#4ADE80' : i === stepIndex ? '#fff' : '#333',
-                }}/>
-                <span style={{
-                  fontSize: 9,
-                  color: i === stepIndex ? '#fff' : '#444',
-                }}>
-                  {s}
-                </span>
-              </div>
-            )
-          )}
+          {stepLabels.map((s, i) => (
+            <div key={s} style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{
+                height: 4, borderRadius: 2, marginBottom: 4,
+                background: i < stepIndex
+                  ? '#4ADE80' : i === stepIndex ? '#fff' : '#333',
+              }}/>
+              <span style={{ fontSize: 9,
+                             color: i === stepIndex ? '#fff' : '#444' }}>
+                {s}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* STEP 1 — Bundle */}
@@ -243,8 +225,7 @@ export default function GradEventPage() {
 
             {bundle && (
               <div style={{ marginTop: 16 }}>
-                <p style={{ fontSize: 13, color: '#888',
-                            marginBottom: 10 }}>
+                <p style={{ fontSize: 13, color: '#888', marginBottom: 10 }}>
                   Add-ons (optional)
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -256,11 +237,9 @@ export default function GradEventPage() {
                           ? '1px solid #4ADE80' : '1px solid #333',
                         background: addons.includes(a.id)
                           ? '#0d1f0d' : 'transparent',
-                        color: addons.includes(a.id)
-                          ? '#4ADE80' : '#888',
+                        color: addons.includes(a.id) ? '#4ADE80' : '#888',
                         fontSize: 12, cursor: 'pointer',
-                      }}
-                    >
+                      }}>
                       {a.name} +${a.price}
                     </button>
                   ))}
@@ -275,8 +254,7 @@ export default function GradEventPage() {
                   background: '#4ADE80', color: '#000',
                   border: 'none', borderRadius: 10,
                   fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
+                }}>
                 Continue — ${total} →
               </button>
             )}
@@ -300,8 +278,7 @@ export default function GradEventPage() {
                 border: '1px solid #333', borderRadius: 10,
                 background: 'transparent', color: '#666',
                 fontSize: 13, cursor: 'pointer',
-              }}
-            >
+              }}>
               ← Back
             </button>
           </div>
@@ -324,24 +301,13 @@ export default function GradEventPage() {
               }}
               onBack={() => setStep('media')}
             />
-            <button onClick={() => setStep('media')}
-              style={{
-                marginTop: 8, width: '100%', padding: 10,
-                border: '1px solid #333', borderRadius: 10,
-                background: 'transparent', color: '#666',
-                fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              ← Back
-            </button>
           </div>
         )}
 
         {/* STEP 4 — Fulfillment */}
         {step === 'fulfillment' && (
           <div>
-            <p style={{ fontSize: 14, fontWeight: 500,
-                        margin: '0 0 16px' }}>
+            <p style={{ fontSize: 14, fontWeight: 500, margin: '0 0 16px' }}>
               How would you like to receive your order?
             </p>
 
@@ -352,10 +318,8 @@ export default function GradEventPage() {
                 borderRadius: 12, padding: '1rem',
                 marginBottom: 10, cursor: 'pointer',
                 background: fulfillment === 'ship' ? '#0d1f0d' : '#111',
-              }}
-            >
-              <p style={{ fontWeight: 600, fontSize: 15,
-                          margin: '0 0 4px' }}>
+              }}>
+              <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>
                 📦 Ship to my door
               </p>
               <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
@@ -370,11 +334,9 @@ export default function GradEventPage() {
                     ? '2px solid #4ADE80' : '1px solid #222',
                   borderRadius: 12, padding: '1rem',
                   marginBottom: 10, cursor: 'pointer',
-                  background: fulfillment === 'pickup'
-                    ? '#0d1f0d' : '#111',
+                  background: fulfillment === 'pickup' ? '#0d1f0d' : '#111',
                   position: 'relative',
-                }}
-              >
+                }}>
                 <span style={{
                   position: 'absolute', top: -10, left: 12,
                   background: '#4ADE80', color: '#000',
@@ -383,13 +345,11 @@ export default function GradEventPage() {
                 }}>
                   AVAILABLE TODAY
                 </span>
-                <p style={{ fontWeight: 600, fontSize: 15,
-                            margin: '0 0 4px' }}>
+                <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px' }}>
                   🎪 Pick up at the booth
                 </p>
                 <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
                   We're set up nearby. Print ready in under 2 minutes.
-                  No shipping cost.
                 </p>
               </div>
             )}
@@ -417,43 +377,46 @@ export default function GradEventPage() {
 
         {/* STEP 5 — Details */}
         {step === 'details' && (
-          <div style={{ display: 'flex',
-                        flexDirection: 'column', gap: 12 }}>
-            <p style={{ fontWeight: 500, fontSize: 14,
-                        margin: '0 0 4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px' }}>
               Your information
             </p>
             <input style={inputStyle} placeholder="Full name *"
               value={form.name}
-              onChange={e => set('name', e.target.value)}/>
+              onChange={e => setField('name', e.target.value)}/>
             <input style={inputStyle} placeholder="Email address *"
               type="email" value={form.email}
-              onChange={e => set('email', e.target.value)}/>
+              onChange={e => setField('email', e.target.value)}/>
             <input style={inputStyle} placeholder="Phone number"
               value={form.phone}
-              onChange={e => set('phone', e.target.value)}/>
+              onChange={e => setField('phone', e.target.value)}/>
+            <input style={inputStyle} placeholder="Graduate's name"
+              value={form.grad_name}
+              onChange={e => setField('grad_name', e.target.value)}/>
+            <input style={inputStyle} placeholder="School name (optional)"
+              value={form.school}
+              onChange={e => setField('school', e.target.value)}/>
 
             {fulfillment === 'ship' && (
               <>
-                <p style={{ fontWeight: 500, fontSize: 14,
-                            margin: '4px 0' }}>
+                <p style={{ fontWeight: 500, fontSize: 14, margin: '4px 0' }}>
                   Shipping address
                 </p>
                 <input style={inputStyle} placeholder="Street address *"
                   value={form.address}
-                  onChange={e => set('address', e.target.value)}/>
+                  onChange={e => setField('address', e.target.value)}/>
                 <div style={{ display: 'grid',
                               gridTemplateColumns: '2fr 1fr', gap: 8 }}>
                   <input style={inputStyle} placeholder="City *"
                     value={form.city}
-                    onChange={e => set('city', e.target.value)}/>
+                    onChange={e => setField('city', e.target.value)}/>
                   <input style={inputStyle} placeholder="State *"
                     value={form.state}
-                    onChange={e => set('state', e.target.value)}/>
+                    onChange={e => setField('state', e.target.value)}/>
                 </div>
                 <input style={inputStyle} placeholder="ZIP code *"
                   value={form.zip}
-                  onChange={e => set('zip', e.target.value)}/>
+                  onChange={e => setField('zip', e.target.value)}/>
               </>
             )}
 
@@ -492,33 +455,32 @@ export default function GradEventPage() {
               background: '#111', borderRadius: 12,
               padding: '1rem', marginBottom: 16,
             }}>
-              <p style={{ fontWeight: 600, fontSize: 15,
-                          margin: '0 0 12px' }}>
+              <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 12px' }}>
                 Order summary
               </p>
               {[
-                ['Bundle', `${selectedBundle.name} — $${selectedBundle.price}`],
+                ['Bundle',    `${selectedBundle.name} — $${selectedBundle.price}`],
                 ...addons.map(id => {
                   const a = ADDONS.find(x => x.id === id);
                   return [a?.name || '', `+$${a?.price}`];
                 }),
-                ['Memory clip', mediaFile
-                  ? `✓ ${mediaType} recorded`
-                  : 'Not recorded'],
-                ['Photo design', editorState?.photoUrl
-                  ? '✓ Designed' : 'Not uploaded'],
-                ['Delivery', fulfillment === 'pickup'
-                  ? 'Pick up at booth' : `Ship to ${form.city}, ${form.state}`],
-                ['Name', form.name],
-                ['Email', form.email],
+                ['Memory clip',  mediaFile ? `✓ ${mediaType} recorded` : 'Not recorded'],
+                ['Design',       editorState ? '✓ Designed' : 'Not designed'],
+                ['Delivery',     fulfillment === 'pickup'
+                  ? 'Pick up at booth'
+                  : `Ship to ${form.city}, ${form.state}`],
+                ['Name',         form.name],
+                ['Graduate',     form.grad_name || '—'],
+                ['School',       form.school    || '—'],
+                ['Email',        form.email],
               ].map(([k, v]) => (
                 <div key={k} style={{
                   display: 'flex', justifyContent: 'space-between',
-                  padding: '5px 0',
-                  borderBottom: '1px solid #222', fontSize: 13,
+                  padding: '5px 0', borderBottom: '1px solid #222',
+                  fontSize: 13,
                 }}>
                   <span style={{ color: '#888' }}>{k}</span>
-                  <span style={{ color: '#fff', maxWidth: 200,
+                  <span style={{ color: '#fff', maxWidth: 220,
                                  textAlign: 'right' }}>{v}</span>
                 </div>
               ))}
@@ -554,8 +516,7 @@ export default function GradEventPage() {
                   fontSize: 14, fontWeight: 700,
                   cursor: loading ? 'wait' : 'pointer',
                 }}>
-                {loading ? 'Opening checkout…'
-                  : `Pay $${total} →`}
+                {loading ? 'Opening checkout…' : `Pay $${total} →`}
               </button>
             </div>
           </div>

@@ -322,6 +322,7 @@ export default function GradEventPage() {
                 setEditorState({ dataUrl, slots });
                 setStep('fulfillment');
               }}
+              onBack={() => setStep('media')}
             />
             <button onClick={() => setStep('media')}
               style={{

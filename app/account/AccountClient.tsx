@@ -65,11 +65,14 @@ export default function AccountClient({
   const [tab,    setTab]    = useState<'orders'|'earnings'|'referral'>('orders');
 
   const balance      = account.token_wallets?.balance || 0;
-  const handle       = account.creator_profiles?.handle;
-  const earnings     = account.creator_profiles?.earnings_balance || 0;
-  const totalEarned  = account.creator_profiles?.total_earned     || 0;
-  const donated      = account.creator_profiles?.total_donated    || 0;
-  const isVerified   = account.creator_profiles?.is_verified      || false;
+  const creatorProfile = Array.isArray(account.creator_profiles) 
+    ? account.creator_profiles[0] 
+    : account.creator_profiles;
+  const handle       = creatorProfile?.handle;
+  const earnings     = creatorProfile?.earnings_balance || 0;
+  const totalEarned  = creatorProfile?.total_earned     || 0;
+  const donated      = creatorProfile?.total_donated    || 0;
+  const isVerified   = creatorProfile?.is_verified      || false;
   const isCreator    = account.is_creator || !!handle;
 
   const referralUrl  = handle

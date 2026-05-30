@@ -7,7 +7,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Generate unique handle with 4-char suffix
 async function generateHandle(firstName: string, lastName: string): Promise<string> {
   const base = `${firstName}-${lastName}`
     .toLowerCase()
@@ -19,14 +18,12 @@ async function generateHandle(firstName: string, lastName: string): Promise<stri
   let attempts = 0;
 
   while (attempts < 10) {
-    const suffix = Math.random().toString(36).slice(2, 6);
+    const suffix    = Math.random().toString(36).slice(2, 6);
     const candidate = `${base}-${suffix}`;
-
     const { count } = await supabase
       .from('creator_profiles')
       .select('*', { count: 'exact', head: true })
       .eq('handle', candidate);
-
     if (count === 0) { handle = candidate; break; }
     attempts++;
   }
@@ -44,7 +41,6 @@ export async function POST(request: Request) {
       social_link, referred_by, phone, attestation,
     } = body;
 
-    // Validate required fields
     if (!first_name || !last_name || !institution_name ||
         !program_or_grade || !phone || !attestation) {
       return NextResponse.json(
@@ -53,7 +49,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate graduation date is Spring 2026
     const gradDate = new Date(graduation_date);
     const minDate  = new Date('2026-04-01');
     const maxDate  = new Date('2026-06-30');
@@ -64,10 +59,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Rate limiting — max 3 signups per IP per day
-    const headerList  = await headers();
-    const ip          = headerList.get('x-forwarded-for') || 'unknown';
-    const oneDayAgo   = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const headerList    = await headers();
+    const ip            = headerList.get('x-forwarded-for') || 'unknown';
+    const oneDayAgo     = new Date(Date.now() - 24*60*60*1000).toISOString();
 
     const { count: recentAttempts } = await supabase
       .from('signup_attempts')
@@ -82,7 +76,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check phone number uniqueness
     const { count: phoneCount } = await supabase
       .from('creator_applications')
       .select('*', { count: 'exact', head: true })
@@ -107,24 +100,23 @@ export async function POST(request: Request) {
       verificationLevel = 'edu_email';
       status            = 'approved';
     } else if (referred_by) {
-      // Verify referrer exists
       const { data: referrer } = await supabase
         .from('creator_profiles')
         .select('id, is_verified')
         .eq('handle', referred_by)
         .single();
-
       if (referrer?.is_verified) {
         verificationLevel = 'referred';
         status            = 'approved';
       }
     } else if (parent_email) {
       verificationLevel = 'parent_email';
-      status            = 'pending'; // 24-48hr review
+      status            = 'pending';
     }
 
     // Create or get account
-    const accountEmail = edu_email || parent_email || `${phone.replace(/\D/g,'')}@unmomentoprints.com`;
+    const accountEmail = edu_email || parent_email ||
+      `${phone.replace(/\D/g,'')}@unmomentoprints.com`;
 
     let accountId: string;
     const { data: existingAccount } = await supabase
@@ -150,11 +142,10 @@ export async function POST(request: Request) {
       accountId = newAccount!.id;
     }
 
-    // Generate handle
     const handle = await generateHandle(first_name, last_name);
 
     // Look up school_id from nces_id
-    let schoolId = null;
+    let schoolId: string | null = null;
     if (school_nces_id) {
       const { data: schoolData } = await supabase
         .from('schools')
@@ -163,57 +154,86 @@ export async function POST(request: Request) {
         .single();
       schoolId = schoolData?.id || null;
     }
-    
+
     // Create creator profile if approved
+    let creatorProfileId: string | null = null;
+
     if (status === 'approved') {
-      const { error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('creator_profiles')
         .insert({
-          account_id:          accountId,
+          account_id:         accountId,
           handle,
-          display_name:        `${first_name} ${last_name}`,
-          school_id:           schoolId,
+          display_name:       `${first_name} ${last_name}`,
+          school_id:          schoolId,
           institution_country,
-          graduation_year:     2026,
-          verification_level:  verificationLevel,
-          is_verified:         true,
-          is_active:           true,
-          referred_by_handle:  referred_by || null,
-          social_link:         social_link || null,
-          parent_email:        parent_email || null,
-        });
+          graduation_year:    2026,
+          verification_level: verificationLevel,
+          is_verified:        true,
+          is_active:          true,
+          referred_by_handle: referred_by  || null,
+          social_link:        social_link  || null,
+          parent_email:       parent_email || null,
+        })
+        .select('id')
+        .single();
 
       if (profileError) {
         console.error('[apply] profile error:', profileError);
+      } else {
+        creatorProfileId = profileData?.id || null;
+      }
+
+      // Auto-enroll in active campaign
+      if (creatorProfileId) {
+        const { data: activePeriod } = await supabase
+          .from('contest_periods')
+          .select('id')
+          .eq('is_active', true)
+          .single();
+
+        if (activePeriod) {
+          await supabase
+            .from('creator_campaign_enrollments')
+            .upsert({
+              creator_id:        creatorProfileId,
+              contest_period_id: activePeriod.id,
+              school_id:         schoolId,
+              graduation_date:   graduation_date || null,
+              is_active:         true,
+            }, { onConflict: 'creator_id,contest_period_id' });
+
+          console.log(`[apply] enrolled ${handle} in campaign ${activePeriod.id}`);
+        }
       }
     }
 
     // Create application record
     await supabase.from('creator_applications').insert({
-      account_id:          accountId,
+      account_id:         accountId,
       first_name,
       last_name,
       institution_name,
       institution_country,
       graduation_date,
       program_or_grade,
-      edu_email:           edu_email || null,
-      parent_email:        parent_email || null,
-      social_link:         social_link || null,
-      referred_by:         referred_by || null,
-      phone_number:        phone,
-      verification_level:  verificationLevel,
+      edu_email:          edu_email   || null,
+      parent_email:       parent_email || null,
+      social_link:        social_link  || null,
+      referred_by:        referred_by  || null,
+      phone_number:       phone,
+      verification_level: verificationLevel,
       status,
-      ip_address:          ip,
+      ip_address:         ip,
     });
 
-    // Log signup attempt for rate limiting
+    // Log signup attempt
     await supabase.from('signup_attempts').insert({
       ip_address: ip,
       phone,
     });
 
-    // Send notification email to you for pending applications
+    // Send notification email for pending applications
     if (status === 'pending') {
       try {
         await fetch('https://api.resend.com/emails', {
@@ -237,7 +257,9 @@ export async function POST(request: Request) {
               <p><strong>Social:</strong> ${social_link || 'None'}</p>
               <p><strong>Phone:</strong> ${phone}</p>
               <hr/>
-              <p>Review at: <a href="https://unmomentoprints.com/admin/creators">Admin → Creators</a></p>
+              <p>Review at:
+                <a href="https://unmomentoprints.com/admin">Admin Console</a>
+              </p>
             `,
           }),
         });
@@ -258,9 +280,6 @@ export async function POST(request: Request) {
 
   } catch (err: any) {
     console.error('[apply]', err.message);
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

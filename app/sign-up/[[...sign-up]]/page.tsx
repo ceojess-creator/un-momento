@@ -18,10 +18,10 @@ export default function SignUpPage() {
           Un Momento Prints
         </p>
         <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', margin: 0 }}>
-          Sign in
+          Create your account
         </h1>
       </div>
-      <SignIn
+      <SignUp
         appearance={{
           variables: {
             colorBackground:      '#ffffff',

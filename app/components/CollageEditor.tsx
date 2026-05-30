@@ -269,11 +269,19 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handlePhotoUpload}/>
 
       {selectedOv&&(
-        <div style={{display:'flex',gap:5,marginBottom:10,flexWrap:'wrap',background:'#111',borderRadius:8,padding:'8px',border:'1px solid #222'}}>
-          <span style={{fontSize:11,color:'#888',flex:1,alignSelf:'center'}}>{selectedOv.text}</span>
-          <button onClick={()=>rotateSelected(-15)} style={{padding:'4px 7px',background:'#1a1a1a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:11,cursor:'pointer'}}>↺</button>
-          <button onClick={()=>rotateSelected(15)}  style={{padding:'4px 7px',background:'#1a1a1a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:11,cursor:'pointer'}}>↻</button>
-          <button onClick={deleteSelectedOverlay}    style={{padding:'4px 7px',background:'#2a0a0a',border:'1px solid #A32D2D',borderRadius:6,color:'#ff6b6b',fontSize:11,cursor:'pointer'}}>🗑</button>
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10,background:'#111',borderRadius:8,padding:'8px',border:'1px solid #222'}}>
+          <div style={{display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:'#888',flex:1,minWidth:50}}>{selectedOv.text}</span>
+            <button onClick={()=>rotateSelected(-15)} style={{padding:'4px 7px',background:'#1a1a1a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:11,cursor:'pointer'}}>↺</button>
+            <button onClick={()=>rotateSelected(15)}  style={{padding:'4px 7px',background:'#1a1a1a',border:'1px solid #333',borderRadius:6,color:'#fff',fontSize:11,cursor:'pointer'}}>↻</button>
+            <button onClick={deleteSelectedOverlay}    style={{padding:'4px 7px',background:'#2a0a0a',border:'1px solid #A32D2D',borderRadius:6,color:'#ff6b6b',fontSize:11,cursor:'pointer'}}>🗑</button>
+          </div>
+          <div>
+            <p style={{fontSize:11,color:'#666',margin:'0 0 3px'}}>Size: {selectedOv.size}px</p>
+            <input type="range" min={12} max={120} value={selectedOv.size}
+              onChange={e=>setOverlays(p=>p.map(o=>o.id===selected?{...o,size:Number(e.target.value)}:o))}
+              style={{width:'100%',accentColor:'#4ADE80'}}/>
+          </div>
         </div>
       )}
 

@@ -17,7 +17,7 @@ export default async function AccountPage() {
   // Get or create account
   let { data: account } = await supabase
     .from('accounts')
-    .select('*, token_wallets(*), creator_profiles(*)')
+    .select('*, token_wallets(*), creator_profiles!creator_profiles_account_id_fkey(*)')
     .eq('email', email)
     .single();
 
@@ -31,7 +31,7 @@ export default async function AccountPage() {
         is_creator:      false,
         onboarding_step: 'welcome',
       })
-      .select('*, token_wallets(*), creator_profiles(*)')
+      .select('*, token_wallets(*), creator_profiles!creator_profiles_account_id_fkey(*)')
       .single();
     account = newAccount;
   }

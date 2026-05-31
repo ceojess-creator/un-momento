@@ -304,6 +304,36 @@ export async function POST(request: Request) {
         }
       }
 
+      // ── Save addons + classify order ─────────────────────
+      if (orderId) {
+        try {
+          const addonIds   = JSON.parse(meta.addons || '[]') as string[];
+          const isOnsite   = meta.fulfillment_source === 'onsite' || meta.fulfillment_type === 'pickup';
+          const buyerEmail = meta.buyer_email || session.customer_email || '';
+          const bundleId   = meta.bundle_id || '';
+
+          // Save addons to orders table
+          await supabase
+            .from('orders')
+            .update({ addons: JSON.stringify(addonIds) })
+            .eq('id', orderId);
+
+          // Classify order — new/returning, reorder, sequence
+          if (buyerEmail && bundleId) {
+            await supabase.rpc('classify_order', {
+              p_order_id:    orderId,
+              p_buyer_email: buyerEmail,
+              p_bundle_id:   bundleId,
+              p_is_onsite:   isOnsite,
+            });
+          }
+
+          console.log(`[webhook] order classified — addons: ${addonIds.join(',')}`);
+        } catch (e) {
+          console.error('[webhook] classify error:', e);
+        }
+      }
+      
       // ── Full inventory deduction ──────────────────────────
       if (orderId) {
         try {

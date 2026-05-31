@@ -1,36 +1,90 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-const isProtectedRoute = createRouteMatcher([
-  '/creator/dashboard(.*)',
-  '/creator/studio(.*)',
-  '/account(.*)',
-  '/admin(.*)',
-]);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-const isPublicApiRoute = createRouteMatcher([
-  '/api/schools/(.*)',
-  '/api/creator/search(.*)',
-  '/api/creator/enroll(.*)',
-  '/api/fundraiser/(.*)',
-  '/api/event/(.*)',
-  '/api/checkout(.*)',
-  '/api/upload(.*)',
-  '/api/webhooks/(.*)',
-  '/api/notify/(.*)',
-  '/api/fulfillment/(.*)',
-  '/api/remove-bg(.*)',
-  '/api/booking(.*)',
-  '/api/picker/(.*)',
-]);
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const query  = searchParams.get('q')      || '';
+    const school = searchParams.get('school') || '';
+    const year   = searchParams.get('year')   || '';
+    const handle = searchParams.get('handle') || '';
 
-export default clerkMiddleware((auth, req) => {
-  if (isPublicApiRoute(req)) return;
-  if (isProtectedRoute(req)) auth.protect();
-});
+    if (!query && !handle) {
+      return NextResponse.json({ creators: [] });
+    }
 
-export const config = {
-  matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
-  ],
-};
+    // Exact handle lookup
+    if (handle) {
+      const { data, error } = await supabase
+        .from('creator_profiles')
+        .select('handle, display_name, graduation_year, total_donated, avatar_url, is_verified, school_id')
+        .eq('handle', handle)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !data) return NextResponse.json({ creators: [] });
+
+      let school_name = '';
+      if (data.school_id) {
+        const { data: schoolData } = await supabase
+          .from('schools')
+          .select('name, city, state_abbr')
+          .eq('id', data.school_id)
+          .single();
+        school_name = schoolData?.name || '';
+      }
+
+      return NextResponse.json({ creators: [{ ...data, school_name }] });
+    }
+
+    // Search creators
+    let q = supabase
+      .from('creator_profiles')
+      .select('handle, display_name, graduation_year, total_donated, avatar_url, is_verified, school_id')
+      .eq('is_active', true)
+      .or(`display_name.ilike.%${query}%,handle.ilike.%${query}%`);
+
+    if (year) q = q.eq('graduation_year', parseInt(year));
+
+    const { data, error } = await q
+      .order('total_donated', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('[creator search] error:', error.message);
+      return NextResponse.json({ creators: [] });
+    }
+
+    // Enrich with school names
+    const schoolIds = [...new Set((data||[]).map(c => c.school_id).filter(Boolean))];
+    const schoolMap: Record<string, string> = {};
+
+    if (schoolIds.length > 0) {
+      const { data: schools } = await supabase
+        .from('schools')
+        .select('id, name, city, state_abbr')
+        .in('id', schoolIds);
+      (schools||[]).forEach(s => { schoolMap[s.id] = s.name; });
+    }
+
+    const creators = (data||[]).map(c => ({
+      ...c,
+      school_name: schoolMap[c.school_id] || '',
+    }));
+
+    const filtered = school
+      ? creators.filter(c => c.school_name.toLowerCase().includes(school.toLowerCase()))
+      : creators;
+
+    return NextResponse.json({ creators: filtered });
+
+  } catch (err: any) {
+    console.error('[creator search]', err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

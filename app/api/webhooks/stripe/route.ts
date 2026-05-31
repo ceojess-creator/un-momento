@@ -304,6 +304,68 @@ export async function POST(request: Request) {
         }
       }
 
+      // ── Full inventory deduction ──────────────────────────
+      if (orderId) {
+        try {
+          const addonIds    = JSON.parse(meta.addons || '[]') as string[];
+          const bundleId    = meta.bundle_id    || '';
+          const buttonSize  = meta.button_size  || null;
+          const fulfillType = meta.fulfillment_type || 'ship';
+
+          const { data: deductResult } = await supabase.rpc('deduct_order_inventory', {
+            p_bundle_id:   bundleId,
+            p_addon_ids:   addonIds,
+            p_button_size: buttonSize,
+            p_fulfillment: fulfillType,
+          });
+
+          if (deductResult?.alerts?.length > 0) {
+            console.warn('[webhook] reorder alerts:', JSON.stringify(deductResult.alerts));
+          }
+          console.log(`[webhook] inventory deducted: ${JSON.stringify(deductResult?.deducted)}`);
+        } catch (e) {
+          console.error('[webhook] inventory deduction error:', e);
+        }
+      }
+
+      // ── Holo upgrade inventory deduction ─────────────────
+      if (orderId && meta.holo_upgrade === 'true') {
+        try {
+          let holoSku  = meta.holo_style_sku  || null;
+          let holoName = meta.holo_style_name || '';
+
+          if (!holoSku || holoSku === 'default') {
+            const { data: defaultStyle } = await supabase.rpc('get_default_holo_style');
+            if (defaultStyle?.[0]) {
+              holoSku  = defaultStyle[0].sku;
+              holoName = defaultStyle[0].name;
+            }
+          }
+
+          if (holoSku) {
+            await supabase.from('inventory')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('sku', holoSku);
+
+            await supabase.rpc('deduct_addon_inventory', {
+              p_addon_ids: ['holo_upgrade'],
+            });
+
+            await supabase.from('orders')
+              .update({
+                holo_upgrade:    true,
+                holo_style_sku:  holoSku,
+                holo_style_name: holoName,
+              })
+              .eq('id', orderId);
+
+            console.log(`[webhook] holo: ${holoSku} assigned to order ${orderId}`);
+          }
+        } catch (e) {
+          console.error('[webhook] holo deduction error:', e);
+        }
+      }
+      
       // ── Create or link buyer account ──────────────────────
       const buyerEmail = meta.buyer_email || session.customer_email;
       if (buyerEmail) {

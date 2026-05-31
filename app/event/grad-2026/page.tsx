@@ -154,6 +154,7 @@ export default function GradEventPage() {
           sticker_data_url:  stickerData?.dataUrl || null,
           button_size:      buttonSize,
           button_design:    buttonDesign,
+          button_design_url: buttonDesign?.dataUrl || null,
         }),
       });
       const data = await res.json();

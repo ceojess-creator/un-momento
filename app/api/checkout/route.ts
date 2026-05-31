@@ -127,6 +127,8 @@ export async function POST(request: Request) {
         media_type:        media_type        || '',
         print_preview_url: printPreviewUrl,
         sticker_data_url:  body.sticker_data?.dataUrl?.slice(0, 490) || '',
+        button_design_url: body.button_design?.dataUrl?.slice(0, 490) || '',
+        button_size:       body.button_size || '',
       },
     });
 

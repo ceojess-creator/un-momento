@@ -170,7 +170,21 @@ export async function POST(request: Request) {
           })
           .eq('id', orderId);
 
-        // If local — add to print queue
+        // ── Route button fulfillment ──────────────────────────
+      if (orderId && meta.button_design_url && meta.button_size) {
+        await supabase
+          .from('orders')
+          .update({
+            button_status:   'queued',
+            button_file_url: meta.button_design_url,
+            button_size:     meta.button_size,
+          })
+          .eq('id', orderId);
+
+        console.log(`[webhook] button queued for batch: order ${orderId}`);
+      }
+      
+      // If local — add to print queue
         if (stickerStatus === 'local' && eventPage) {
           const { data: pixcut } = await supabase
             .from('event_hardware')

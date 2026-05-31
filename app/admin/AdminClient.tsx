@@ -170,7 +170,7 @@ interface AdminClientProps {
   contractors:   Contractor[];
 }
 
-type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers';
+type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers'|'buttons';
 
 const C = {
   bg:      '#f4f6f8',
@@ -312,6 +312,174 @@ function StickerQueuePanel() {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ButtonQueuePanel() {
+  const [orders,  setOrders]  = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter,  setFilter]  = useState<'queued'|'batched'|'shipped'|'all'>('queued');
+  const [gangSheets, setGangSheets] = useState<any[]>([]);
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      try {
+        const [ordRes, sheetRes] = await Promise.all([
+          fetch('/api/admin/button-queue'),
+          fetch('/api/admin/button-gang-sheets'),
+        ]);
+        const ordData   = await ordRes.json();
+        const sheetData = await sheetRes.json();
+        setOrders(ordData.orders||[]);
+        setGangSheets(sheetData.sheets||[]);
+      } catch(e){ console.error(e); }
+      setLoading(false);
+    }
+    load();
+  },[]);
+
+  async function markShipped(orderId:string, tracking:string){
+    await fetch('/api/admin/button-queue',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({order_id:orderId,tracking,status:'shipped'}),
+    });
+    setOrders(p=>p.map(o=>o.id===orderId
+      ?{...o,button_status:'shipped',button_tracking:tracking}:o));
+  }
+
+  const filtered = filter==='all' ? orders : orders.filter(o=>o.button_status===filter);
+  const statusColor=(s:string)=>
+    s==='shipped'?C.green:s==='batched'?C.blue:s==='local'?C.green:C.amber;
+
+  return (
+    <div>
+      {/* Gang sheets */}
+      {gangSheets.length>0&&(
+        <div style={{marginBottom:16}}>
+          <p style={{fontSize:11,fontWeight:600,color:C.muted,
+                     letterSpacing:1,textTransform:'uppercase',margin:'0 0 8px'}}>
+            Gang sheets
+          </p>
+          {gangSheets.map(s=>(
+            <div key={s.id} style={{
+              background:C.surface,border:`1px solid ${C.border}`,
+              borderRadius:10,padding:'10px 14px',marginBottom:6,
+              display:'flex',justifyContent:'space-between',alignItems:'center',
+            }}>
+              <div>
+                <p style={{fontWeight:600,fontSize:13,margin:'0 0 2px',color:C.text}}>
+                  Sheet {s.sheet_number} · {s.button_count} buttons · {s.batch_date}
+                </p>
+                <p style={{fontSize:11,color:C.faint,margin:0}}>
+                  {s.order_ids?.length||0} orders
+                </p>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                {badge(s.status,
+                  s.status==='printed'?C.green:C.amber,
+                  s.status==='printed'?C.greenBg:C.amberBg
+                )}
+                {s.sheet_url&&(
+                  <a href={s.sheet_url} target="_blank" rel="noopener noreferrer"
+                    style={{padding:'4px 10px',background:C.surface,
+                            border:`1px solid ${C.border}`,borderRadius:6,
+                            color:C.text,fontSize:11,textDecoration:'none'}}>
+                    Print →
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:12}}>
+        {(['queued','batched','shipped','all'] as const).map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} style={{
+            padding:'5px 12px',borderRadius:16,cursor:'pointer',
+            background:filter===f?C.green:C.surface,
+            color:filter===f?'#fff':C.muted,
+            border:`1px solid ${filter===f?C.green:C.border}`,
+            fontSize:11,fontWeight:filter===f?600:400,
+            textTransform:'capitalize',
+          }}>
+            {f} ({orders.filter(o=>f==='all'?true:o.button_status===f).length})
+          </button>
+        ))}
+      </div>
+
+      {loading?(
+        <p style={{color:C.faint,fontSize:13,textAlign:'center',padding:'32px'}}>Loading...</p>
+      ):filtered.length===0?(
+        <div style={{background:C.greenBg,border:`1px solid ${C.greenBdr}`,
+                     borderRadius:10,padding:'24px',textAlign:'center'}}>
+          <p style={{color:C.green,fontSize:14,fontWeight:500,margin:0}}>
+            {filter==='queued'?'✓ No buttons waiting to batch':'No buttons in this status'}
+          </p>
+        </div>
+      ):(
+        filtered.map(o=>(
+          <div key={o.id} style={{
+            background:C.surface,border:`1px solid ${C.border}`,
+            borderRadius:10,padding:'12px 14px',marginBottom:6,
+          }}>
+            <div style={{display:'flex',justifyContent:'space-between',
+                         alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+              <div>
+                <p style={{fontWeight:600,fontSize:13,margin:'0 0 2px',color:C.text}}>
+                  {o.buyer_name}
+                  {o.order_number&&(
+                    <span style={{marginLeft:8,fontSize:11,color:C.green,
+                                  fontFamily:'monospace'}}>#{o.order_number}</span>
+                  )}
+                </p>
+                <p style={{fontSize:12,color:C.muted,margin:'0 0 2px'}}>
+                  {o.button_size?.replace(/_/g,' ')||'Button'}
+                  {' · '}
+                  {o.fulfillment_type==='ship'
+                    ?`Ship to ${o.ship_city}, ${o.ship_state}`
+                    :'Booth pickup'}
+                </p>
+                <p style={{fontSize:11,color:C.faint,margin:0}}>
+                  {o.button_batch_date
+                    ?`Batched ${o.button_batch_date}`
+                    :new Date(o.created_at).toLocaleDateString()}
+                  {o.button_asset_tag&&` · ${o.button_asset_tag}`}
+                  {o.button_tracking&&` · Tracking: ${o.button_tracking}`}
+                </p>
+              </div>
+              <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                {badge(o.button_status||'queued',
+                  statusColor(o.button_status),
+                  statusColor(o.button_status)+'22'
+                )}
+                {o.button_file_url&&(
+                  <a href={o.button_file_url} target="_blank" rel="noopener noreferrer"
+                    style={{padding:'4px 10px',background:C.surface,
+                            border:`1px solid ${C.border}`,borderRadius:6,
+                            color:C.text,fontSize:11,textDecoration:'none'}}>
+                    Design →
+                  </a>
+                )}
+                {o.button_status==='batched'&&(
+                  <button onClick={()=>{
+                    const tracking=prompt(`Tracking for ${o.buyer_name}:`);
+                    if(tracking) markShipped(o.id,tracking);
+                  }} style={{
+                    padding:'4px 10px',background:C.green,
+                    border:'none',borderRadius:6,color:'#fff',
+                    fontSize:11,cursor:'pointer',fontWeight:600,
+                  }}>Mark shipped</button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
@@ -720,6 +888,7 @@ export default function AdminClient({
           ['events',       '📍 Events'      ],
           ['operations',   '🎪 Operations'  ],
           ['stickers',     '🎨 Stickers'    ],
+          ['buttons',      '🔵 Buttons'     ],
           ['inventory',    '🏪 Inventory'   ],
         ] as [Tab,string][]).map(([t,lbl])=>(
           <button key={t} onClick={()=>setTab(t)} style={tabStyle(t)}>
@@ -1383,6 +1552,43 @@ export default function AdminClient({
           </div>
         )}
         
+        {/* ── BUTTONS ── */}
+        {tab==='buttons'&&(
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',
+                         alignItems:'center',marginBottom:16}}>
+              <div>
+                <p style={{fontSize:11,fontWeight:600,color:C.muted,
+                           letterSpacing:1,textTransform:'uppercase',margin:'0 0 4px'}}>
+                  Button gang sheet queue
+                </p>
+                <p style={{fontSize:12,color:C.faint,margin:0}}>
+                  In-house button press · nightly batch at 11pm Arizona time
+                </p>
+              </div>
+              <button
+                onClick={async()=>{
+                  const res=await fetch('/api/cron/button-batch',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({secret:process.env.NEXT_PUBLIC_CRON_SECRET||''}),
+                  });
+                  const data=await res.json();
+                  setMessage(data.batched
+                    ? `✓ Batch sent — ${data.batched} buttons on ${data.sheets} sheets`
+                    : '✓ No pending buttons');
+                  setTimeout(()=>setMessage(null),4000);
+                }}
+                style={{padding:'8px 16px',background:C.green,color:'#fff',
+                        border:'none',borderRadius:8,fontSize:12,
+                        fontWeight:600,cursor:'pointer'}}>
+                Run batch now
+              </button>
+            </div>
+            <ButtonQueuePanel />
+          </div>
+        )}
+
         {/* ── INVENTORY ── */}
         {tab==='inventory'&&(
           <div>

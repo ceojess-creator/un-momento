@@ -51,9 +51,11 @@ export async function GET(request: Request) {
       .limit(20);
 
     if (error) {
-      console.error('[creator search] query error:', error.message);
-      return NextResponse.json({ creators: [] });
+      console.error('[creator search] error:', error.message);
+      return NextResponse.json({ creators: [], debug_error: error.message });
     }
+
+    console.log('[creator search] found:', data?.length, 'for query:', query);
 
     const creators = (data || []).map((c: any) => ({
       ...c,

@@ -259,15 +259,7 @@ export default function GradEventPage() {
                 nextStep('creator');
               }}
             />
-            {selectedCreator && (
-              <button onClick={() => nextStep('creator')} style={{
-                width:'100%', marginTop:12, padding:14,
-                background:'#4ADE80', color:'#000', border:'none',
-                borderRadius:10, fontSize:15, fontWeight:700, cursor:'pointer',
-              }}>
-                Continue →
-              </button>
-            )}
+            
             <button onClick={() => prevStep('creator')} style={{
               width:'100%', marginTop:8, padding:10,
               border:'1px solid #333', borderRadius:10,

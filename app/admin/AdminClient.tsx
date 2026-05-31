@@ -169,6 +169,7 @@ interface AdminClientProps {
   printQueue:    PrintItem[];
   staffRoster:   StaffMember[];
   contractors:   Contractor[];
+  allInventory:  any[];
 }
 
 type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers'|'buttons'|'campaign';
@@ -750,7 +751,7 @@ function StaffAssignModal({
 }
 export default function AdminClient({
   stats, recentOrders, creators, pendingApps,
-  reorderAlerts, credits, events,
+  reorderAlerts, credits, events, allInventory,
   hardware, assemblyQueue, printQueue,
   staffRoster, contractors,
 }: AdminClientProps) {
@@ -1621,53 +1622,103 @@ export default function AdminClient({
         {/* ── INVENTORY ── */}
         {tab==='inventory'&&(
           <div>
-            {reorderAlerts.length===0?(
-              <div style={{textAlign:'center',padding:'48px',background:C.greenBg,
-                           borderRadius:12,border:`1px solid ${C.greenBdr}`}}>
-                <p style={{fontSize:18,margin:'0 0 6px'}}>✓</p>
-                <p style={{fontSize:14,color:C.green,fontWeight:500,margin:0}}>
-                  All inventory levels are healthy
-                </p>
-              </div>
-            ):(
-              <div>
-                <p style={{fontSize:13,color:C.muted,margin:'0 0 16px'}}>
+            {/* Alerts summary */}
+            {reorderAlerts.length>0&&(
+              <div style={{background:C.redBg,border:`1px solid ${C.redBdr}`,
+                           borderRadius:10,padding:'10px 14px',marginBottom:16,
+                           display:'flex',alignItems:'center',gap:8}}>
+                <span style={{color:C.red,fontWeight:700,fontSize:14}}>⚠️</span>
+                <span style={{color:C.red,fontSize:13,fontWeight:600}}>
                   {reorderAlerts.length} item{reorderAlerts.length!==1?'s':''} need attention
-                </p>
-                {reorderAlerts.map(a=>(
-                  <div key={a.sku} style={{
-                    background:a.alert_level==='OUT OF STOCK'?C.redBg:C.amberBg,
-                    borderRadius:12,padding:'14px 16px',marginBottom:8,
-                    border:`1px solid ${a.alert_level==='OUT OF STOCK'?C.redBdr:C.amberBdr}`,
-                  }}>
-                    <p style={{fontWeight:600,fontSize:13,margin:'0 0 3px',
-                               color:a.alert_level==='OUT OF STOCK'?C.red:C.amber,
-                               display:'flex',alignItems:'center',gap:8}}>
-                      {a.name}
-                      {badge(a.alert_level,
-                        a.alert_level==='OUT OF STOCK'?C.red:C.amber,
-                        a.alert_level==='OUT OF STOCK'?C.redBg:C.amberBg
-                      )}
-                    </p>
-                    <p style={{fontSize:12,color:C.muted,margin:'0 0 2px'}}>
-                      SKU: {a.sku} · {a.category}
-                    </p>
-                    <p style={{fontSize:11,color:C.muted,margin:0}}>
-                      {a.on_hand} on hand · reorder at {a.reorder_at} ·
-                      suggest ordering {a.suggest_order}
-                      {a.supplier_name?` from ${a.supplier_name}`:''}
-                    </p>
-                  </div>
-                ))}
+                </span>
               </div>
             )}
+
+            {/* Full inventory grouped by category */}
+            {Object.entries(
+              (allInventory||[]).reduce((acc:any, item:any) => {
+                const cat = item.category || 'other';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(item);
+                return acc;
+              }, {})
+            ).map(([category, items]:any) => (
+              <div key={category} style={{marginBottom:20}}>
+                <p style={{fontSize:11,fontWeight:600,color:C.muted,
+                           letterSpacing:1,textTransform:'uppercase',
+                           margin:'0 0 8px',paddingBottom:4,
+                           borderBottom:`1px solid ${C.border}`}}>
+                  {category.replace(/_/g,' ')}
+                </p>
+                {items.map((item:any) => {
+                  const isOut   = item.quantity_on_hand <= 0;
+                  const isLow   = !isOut && item.quantity_on_hand <= item.reorder_point;
+                  const isGood  = !isOut && !isLow;
+                  const pct     = item.reorder_point > 0
+                    ? Math.min(100, Math.round((item.quantity_on_hand / (item.reorder_point * 3)) * 100))
+                    : 100;
+                  return (
+                    <div key={item.sku} style={{
+                      background:C.surface,
+                      border:`1px solid ${isOut?C.redBdr:isLow?C.amberBdr:C.border}`,
+                      borderRadius:8,padding:'10px 12px',marginBottom:6,
+                    }}>
+                      <div style={{display:'flex',justifyContent:'space-between',
+                                   alignItems:'flex-start',gap:8}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                            <p style={{fontSize:13,fontWeight:600,color:C.text,margin:0,
+                                       whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {item.name}
+                            </p>
+                            {isOut&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:8,
+                              background:C.redBg,color:C.red,border:`1px solid ${C.redBdr}`,
+                              fontWeight:700,flexShrink:0}}>OUT</span>}
+                            {isLow&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:8,
+                              background:C.amberBg,color:C.amber,border:`1px solid ${C.amberBdr}`,
+                              fontWeight:700,flexShrink:0}}>LOW</span>}
+                          </div>
+                          <p style={{fontSize:11,color:C.faint,margin:'0 0 4px',fontFamily:'monospace'}}>
+                            {item.sku}
+                          </p>
+                          {/* Stock bar */}
+                          {item.reorder_point>0&&(
+                            <div style={{height:3,background:C.border,borderRadius:2,overflow:'hidden',width:'100%'}}>
+                              <div style={{
+                                width:`${pct}%`,height:'100%',borderRadius:2,
+                                background:isOut?C.red:isLow?C.amber:C.green,
+                              }}/>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{textAlign:'right',flexShrink:0}}>
+                          <p style={{fontSize:15,fontWeight:700,margin:'0 0 1px',
+                                     color:isOut?C.red:isLow?C.amber:C.text}}>
+                            {Math.round(item.quantity_on_hand)}
+                          </p>
+                          <p style={{fontSize:10,color:C.faint,margin:0}}>
+                            {item.unit} · min {item.reorder_point}
+                          </p>
+                        </div>
+                      </div>
+                      {(isOut||isLow)&&item.supplier_name&&(
+                        <p style={{fontSize:11,color:isOut?C.red:C.amber,margin:'4px 0 0'}}>
+                          Order {item.reorder_quantity} from {item.supplier_name}
+                          {item.supplier_url&&(
+                            <a href={item.supplier_url} target="_blank" rel="noopener noreferrer"
+                              style={{marginLeft:6,color:C.blue,textDecoration:'none'}}>
+                              → Link
+                            </a>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
-
-      </div>
-    </main>
-  );
-}
 
 function CampaignDashboard() {
   const [summary,   setSummary]   = useState<any>(null);

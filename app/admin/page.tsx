@@ -22,20 +22,21 @@ export default async function AdminPage() {
 
   // Fetch all data in parallel
   const [
-    { data: todayOrders,   error: e1 },
-    { data: recentOrders,  error: e2 },
-    { data: allOrders,     error: e3 },
-    { count: pendingCount, error: e4 },
-    { data: creators,      error: e5 },
-    { data: pendingApps,   error: e6 },
-    { data: reorderAlerts, error: e7 },
-    { data: credits,       error: e8 },
-    { data: events,        error: e9 },
+    { data: todayOrders,   error: e1  },
+    { data: recentOrders,  error: e2  },
+    { data: allOrders,     error: e3  },
+    { count: pendingCount, error: e4  },
+    { data: creators,      error: e5  },
+    { data: pendingApps,   error: e6  },
+    { data: reorderAlerts, error: e7  },
+    { data: credits,       error: e8  },
+    { data: events,        error: e9  },
     { data: hardware,      error: e10 },
     { data: assemblyQueue, error: e11 },
     { data: printQueue,    error: e12 },
     { data: staffRoster,   error: e13 },
     { data: contractors,   error: e14 },
+    { data: allInventory,  error: e15 },
   ] = await Promise.all([
     supabase.from('orders').select('*').gte('created_at', `${today}T00:00:00`).order('created_at', { ascending: false }),
     supabase.from('orders').select('*').gte('created_at', thirtyAgo).order('created_at', { ascending: false }).limit(100),
@@ -51,10 +52,11 @@ export default async function AdminPage() {
     supabase.from('print_queue').select('*, event_hardware(device_name, asset_tag), event_pages(name), orders(buyer_name)').limit(50),
     supabase.from('event_staff').select('*, contractors(first_name, last_name, phone, email), staff_roles(color, base_hourly), event_pages(name, event_date)').limit(100),
     supabase.from('contractors').select('*').order('last_name').limit(100),
+    supabase.from('inventory').select('*').order('category').order('name'),
   ]);
 
   // Log errors for debugging
-  const errors = {e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11,e12,e13,e14};
+  const errors = {e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11,e12,e13,e14,e15};
   Object.entries(errors).forEach(([k,v]) => {
     if (v) console.error(`[admin] query ${k} error:`, v.message);
   });
@@ -128,6 +130,7 @@ export default async function AdminPage() {
       printQueue={flatPrintQueue}
       staffRoster={flatStaff}
       contractors={contractors     || []}
+      allInventory={allInventory   || []}
     />
   );
 }

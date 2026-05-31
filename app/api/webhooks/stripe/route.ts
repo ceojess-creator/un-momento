@@ -234,6 +234,47 @@ export async function POST(request: Request) {
         }
       }
 
+      // ── Deduct physical add-on inventory ─────────────────
+      if (orderId && meta.addons) {
+        try {
+          const addonIds = JSON.parse(meta.addons || '[]') as string[];
+          const physicalAddons = addonIds.filter(id =>
+            ['metallic_marker','oil_marker','card_jacket'].includes(id)
+          );
+
+          if (physicalAddons.length > 0) {
+            const { data: deductResult } = await supabase.rpc('deduct_addon_inventory', {
+              p_addon_ids: physicalAddons,
+            });
+
+            // Log reorder alerts
+            if (deductResult?.alerts?.length > 0) {
+              console.warn('[webhook] inventory reorder alerts:', deductResult.alerts);
+            }
+
+            // Add physical add-ons to packing list
+            await supabase.from('order_assembly').upsert({
+              order_id:        orderId,
+              event_id:        null,
+              status:          'pending',
+              items_expected:  physicalAddons.length + 1, // +1 for print
+              pickup_location: meta.fulfillment_type === 'pickup'
+                ? 'Un Momento booth'
+                : 'Ship with print',
+              notes: `Pack with order: ${physicalAddons.map(id =>
+                id==='metallic_marker' ? 'Metallic Marker' :
+                id==='oil_marker'      ? 'Oil Marker' :
+                id==='card_jacket'     ? 'Black Card Jacket' : id
+              ).join(', ')}`,
+            }, { onConflict: 'order_id' });
+
+            console.log(`[webhook] deducted inventory for: ${physicalAddons.join(', ')}`);
+          }
+        } catch (e) {
+          console.error('[webhook] inventory deduction error:', e);
+        }
+      }
+      
       // ── Create or link buyer account ──────────────────────
       const buyerEmail = meta.buyer_email || session.customer_email;
       if (buyerEmail) {

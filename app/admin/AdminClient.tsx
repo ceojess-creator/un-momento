@@ -26,6 +26,7 @@ interface Order {
   ship_city:         string;
   ship_state:        string;
   campaign_slug:     string;
+  addons:            string;
 }
 interface Creator {
   id:                 string;
@@ -1021,6 +1022,20 @@ export default function AdminClient({
                       ${o.tokens_spent?.toFixed(2)}
                     </span>
                     {badge(o.fulfillment_status,statusColor(o.fulfillment_status),statusBg(o.fulfillment_status))}
+                    {o.addons && JSON.parse(o.addons||'[]').some((a:string) =>
+                      ['metallic_marker','oil_marker','card_jacket'].includes(a)
+                    ) && (
+                      <div style={{
+                        fontSize:11, padding:'3px 8px', borderRadius:6,
+                        background:C.amberBg, color:C.amber,
+                        border:`1px solid ${C.amberBdr}`,
+                      }}>
+                        📦 Pack: {JSON.parse(o.addons||'[]')
+                          .filter((a:string) => ['metallic_marker','oil_marker','card_jacket'].includes(a))
+                          .map((a:string) => a==='metallic_marker'?'Metallic Marker':a==='oil_marker'?'Oil Marker':'Card Jacket')
+                          .join(' + ')}
+                      </div>
+                    )}
                     {o.fulfillment_status==='pending'&&(
                       <button onClick={()=>updateFulfillment(o.id,'fulfilled')} style={{
                         padding:'4px 10px',background:C.surface,

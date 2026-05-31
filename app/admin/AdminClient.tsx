@@ -379,10 +379,14 @@ function ButtonQueuePanel() {
                 </p>
               </div>
               <div style={{display:'flex',gap:6}}>
-                {badge(s.status,
-                  s.status==='printed'?C.green:C.amber,
-                  s.status==='printed'?C.greenBg:C.amberBg
-                )}
+                <span style={{
+                  fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                  color:      s.status==='printed'?C.green:C.amber,
+                  background: s.status==='printed'?C.greenBg:C.amberBg,
+                  border:`1px solid ${s.status==='printed'?C.greenBdr:C.amberBdr}`,
+                }}>
+                  {s.status}
+                </span>
                 {s.sheet_url&&(
                   <a href={s.sheet_url} target="_blank" rel="noopener noreferrer"
                     style={{padding:'4px 10px',background:C.surface,
@@ -454,10 +458,14 @@ function ButtonQueuePanel() {
                 </p>
               </div>
               <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-                {badge(o.button_status||'queued',
-                  statusColor(o.button_status),
-                  statusColor(o.button_status)+'22'
-                )}
+                <span style={{
+                  fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                  color:      statusColor(o.button_status||'queued'),
+                  background: statusColor(o.button_status||'queued')+'22',
+                  border:`1px solid ${statusColor(o.button_status||'queued')}44`,
+                }}>
+                  {o.button_status||'queued'}
+                </span>
                 {o.button_file_url&&(
                   <a href={o.button_file_url} target="_blank" rel="noopener noreferrer"
                     style={{padding:'4px 10px',background:C.surface,

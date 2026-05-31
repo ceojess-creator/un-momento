@@ -171,7 +171,7 @@ interface AdminClientProps {
   contractors:   Contractor[];
 }
 
-type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers'|'buttons';
+type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers'|'buttons'|'campaign';
 
 const C = {
   bg:      '#f4f6f8',
@@ -896,6 +896,7 @@ export default function AdminClient({
           ['applications', '📋 Applications'],
           ['events',       '📍 Events'      ],
           ['operations',   '🎪 Operations'  ],
+          ['campaign',     '📊 Campaign'    ],
           ['stickers',     '🎨 Stickers'    ],
           ['buttons',      '🔵 Buttons'     ],
           ['inventory',    '🏪 Inventory'   ],
@@ -1537,6 +1538,11 @@ export default function AdminClient({
           </div>
         )}
 
+        {/* ── CAMPAIGN ── */}
+        {tab==='campaign'&&(
+          <CampaignDashboard />
+        )}
+        
         {/* ── STICKERS ── */}
         {tab==='stickers'&&(
           <div>
@@ -1660,5 +1666,293 @@ export default function AdminClient({
 
       </div>
     </main>
+  );
+}
+
+function CampaignDashboard() {
+  const [summary,   setSummary]   = useState<any>(null);
+  const [items,     setItems]     = useState<any>(null);
+  const [creators,  setCreators]  = useState<any[]>([]);
+  const [orders,    setOrders]    = useState<any[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [slideOrder,setSlideOrder]= useState<any>(null);
+  const [campaign,  setCampaign]  = useState('grad-2026');
+
+  const GOAL = 50000;
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      try {
+        const res  = await fetch(`/api/admin/campaign?slug=${campaign}`);
+        const data = await res.json();
+        setSummary(data.summary  || {});
+        setItems(data.items      || {});
+        setCreators(data.creators|| []);
+        setOrders(data.orders    || []);
+      } catch(e){ console.error(e); }
+      setLoading(false);
+    }
+    load();
+  },[campaign]);
+
+  const revenue    = summary?.total_revenue   || 0;
+  const goalPct    = Math.min(100, Math.round((revenue/GOAL)*100));
+  const totalOrders= summary?.total_orders    || 0;
+
+  const accessPoints = [
+    { label:'Online New',        val: summary?.online_new        || 0, color:'#4ADE80' },
+    { label:'Online Returning',  val: summary?.online_returning  || 0, color:'#60a5fa' },
+    { label:'Booth New',         val: summary?.booth_new         || 0, color:'#f59e0b' },
+    { label:'Booth Returning',   val: summary?.booth_returning   || 0, color:'#f472b6' },
+  ];
+
+  const itemRows = [
+    { label:'Photo prints',     val: items?.photo_prints     || 0, icon:'🖼️'  },
+    { label:'Sticker sheets',   val: items?.sticker_sheets   || 0, icon:'🎨'  },
+    { label:'Buttons/magnets',  val: items?.buttons          || 0, icon:'🔵'  },
+    { label:'Holo upgrades',    val: items?.holo_upgrades    || 0, icon:'✨'  },
+    { label:'Metallic markers', val: items?.metallic_markers || 0, icon:'✏️'  },
+    { label:'Oil markers',      val: items?.oil_markers      || 0, icon:'🖊️'  },
+    { label:'Card jackets',     val: items?.card_jackets     || 0, icon:'🗂️'  },
+    { label:'Reorders',         val: summary?.reorders       || 0, icon:'🔄'  },
+    { label:'Ship orders',      val: summary?.ship_orders    || 0, icon:'📦'  },
+    { label:'Pickup orders',    val: summary?.pickup_orders  || 0, icon:'🎪'  },
+  ];
+
+  if (loading) return (
+    <p style={{color:C.faint,fontSize:13,textAlign:'center',padding:'48px'}}>
+      Loading campaign data...
+    </p>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+        <div>
+          <p style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:'uppercase',margin:'0 0 4px'}}>
+            Campaign analytics
+          </p>
+          <p style={{fontSize:12,color:C.faint,margin:0}}>
+            Spring 2026 · April 1 – June 30
+          </p>
+        </div>
+        <select value={campaign} onChange={e=>setCampaign(e.target.value)}
+          style={{padding:'6px 10px',borderRadius:7,border:`1px solid ${C.border}`,
+                  background:C.surface,color:C.text,fontSize:12,cursor:'pointer'}}>
+          <option value="grad-2026">Graduation 2026</option>
+        </select>
+      </div>
+
+      {/* Revenue gauge */}
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'20px',marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:10}}>
+          <div>
+            <p style={{fontSize:11,color:C.muted,margin:'0 0 2px',textTransform:'uppercase',letterSpacing:1}}>Campaign revenue</p>
+            <p style={{fontSize:28,fontWeight:700,color:C.text,margin:0}}>
+              ${revenue.toLocaleString()}
+            </p>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <p style={{fontSize:11,color:C.muted,margin:'0 0 2px'}}>Goal</p>
+            <p style={{fontSize:18,fontWeight:600,color:C.faint,margin:0}}>${GOAL.toLocaleString()}</p>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{height:12,background:C.border,borderRadius:6,overflow:'hidden',marginBottom:6}}>
+          <div style={{
+            width:`${goalPct}%`,height:'100%',
+            background:`linear-gradient(90deg, ${C.green}, #4ADE80)`,
+            borderRadius:6,transition:'width .5s ease',
+          }}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between'}}>
+          <p style={{fontSize:11,color:C.green,margin:0,fontWeight:600}}>{goalPct}% of goal</p>
+          <p style={{fontSize:11,color:C.muted,margin:0}}>${(GOAL-revenue).toLocaleString()} remaining</p>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
+        {[
+          { label:'Total orders',   val:totalOrders,                     color:C.blue  },
+          { label:'Avg order value',val:`$${totalOrders>0?Math.round(revenue/totalOrders):0}`, color:C.green },
+          { label:'Active creators',val:creators.length,                  color:C.amber },
+        ].map(s=>(
+          <div key={s.label} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:'12px'}}>
+            <p style={{fontSize:11,color:C.muted,margin:'0 0 4px',textTransform:'uppercase',letterSpacing:1}}>{s.label}</p>
+            <p style={{fontSize:22,fontWeight:700,color:s.color,margin:0}}>{s.val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Access point breakdown */}
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'16px',marginBottom:12}}>
+        <p style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:'uppercase',margin:'0 0 12px'}}>
+          Access points
+        </p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+          {accessPoints.map(a=>(
+            <div key={a.label} style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{
+                width:10,height:10,borderRadius:'50%',
+                background:a.color,flexShrink:0,
+              }}/>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:11,color:C.muted}}>{a.label}</span>
+                  <span style={{fontSize:11,fontWeight:600,color:C.text}}>{a.val}</span>
+                </div>
+                <div style={{height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
+                  <div style={{
+                    width:`${totalOrders>0?Math.round((a.val/totalOrders)*100):0}%`,
+                    height:'100%',background:a.color,borderRadius:2,
+                  }}/>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Item totals */}
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'16px',marginBottom:12}}>
+        <p style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:'uppercase',margin:'0 0 12px'}}>
+          Items sold
+        </p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:6}}>
+          {itemRows.map(r=>(
+            <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:12,color:C.muted}}>{r.icon} {r.label}</span>
+              <span style={{fontSize:13,fontWeight:600,color:r.val>0?C.text:C.faint}}>{r.val}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Creator leaderboard */}
+      {creators.length > 0 && (
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'16px',marginBottom:12}}>
+          <p style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:'uppercase',margin:'0 0 12px'}}>
+            Creator leaderboard
+          </p>
+          {creators.map((c,i)=>(
+            <div key={c.creator_handle} style={{
+              display:'flex',alignItems:'center',gap:10,
+              padding:'8px 0',borderBottom:`1px solid ${C.border}`,
+            }}>
+              <span style={{
+                width:22,height:22,borderRadius:'50%',
+                background:i===0?C.green:i===1?C.blue:C.border,
+                color:i<2?'#fff':C.muted,
+                fontSize:11,fontWeight:700,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,
+              }}>{i+1}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:13,fontWeight:600,color:C.text,margin:'0 0 1px',
+                           whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  {c.creator_name||c.creator_handle}
+                </p>
+                <p style={{fontSize:11,color:C.faint,margin:0}}>{c.school_name||'No school'}</p>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <p style={{fontSize:13,fontWeight:600,color:C.green,margin:'0 0 1px'}}>{c.order_count} orders</p>
+                <p style={{fontSize:11,color:C.muted,margin:0}}>${c.revenue_attributed||0}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Live order feed */}
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'16px'}}>
+        <p style={{fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,textTransform:'uppercase',margin:'0 0 12px'}}>
+          Recent orders
+        </p>
+        {orders.length===0 ? (
+          <p style={{color:C.faint,fontSize:13,textAlign:'center',padding:'16px 0'}}>No orders yet</p>
+        ) : orders.slice(0,20).map(o=>(
+          <div key={o.id}
+            onClick={()=>setSlideOrder(o)}
+            style={{
+              display:'flex',alignItems:'center',gap:10,
+              padding:'8px 0',borderBottom:`1px solid ${C.border}`,
+              cursor:'pointer',
+            }}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>{o.buyer_name}</span>
+                {o.order_number&&(
+                  <span style={{fontSize:10,color:C.green,fontFamily:'monospace'}}>#{o.order_number}</span>
+                )}
+                {o.is_reorder&&(
+                  <span style={{fontSize:9,padding:'1px 5px',borderRadius:8,
+                                background:C.blueBg,color:C.blue,border:`1px solid ${C.blueBdr}`}}>
+                    reorder
+                  </span>
+                )}
+              </div>
+              <p style={{fontSize:11,color:C.faint,margin:0}}>
+                {o.product_type} · {o.access_point?.replace('_',' ')} ·{' '}
+                {new Date(o.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div style={{textAlign:'right',flexShrink:0}}>
+              <p style={{fontSize:13,fontWeight:600,color:C.green,margin:'0 0 1px'}}>${o.tokens_spent||0}</p>
+              {o.creator_name&&(
+                <p style={{fontSize:10,color:C.muted,margin:0}}>{o.creator_name}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Slide-out order panel */}
+      {slideOrder&&(
+        <div style={{
+          position:'fixed',top:0,right:0,bottom:0,width:360,
+          background:C.surface,borderLeft:`1px solid ${C.border}`,
+          zIndex:1000,overflowY:'auto',padding:'20px',
+          boxShadow:'-4px 0 24px rgba(0,0,0,0.08)',
+        }}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <p style={{fontSize:15,fontWeight:600,color:C.text,margin:0}}>
+              Order #{slideOrder.order_number}
+            </p>
+            <button onClick={()=>setSlideOrder(null)}
+              style={{padding:'4px 10px',border:`1px solid ${C.border}`,borderRadius:6,
+                      background:'transparent',color:C.muted,cursor:'pointer',fontSize:13}}>
+              ✕
+            </button>
+          </div>
+
+          {[
+            ['Customer',    slideOrder.buyer_name],
+            ['Email',       slideOrder.buyer_email],
+            ['Bundle',      slideOrder.product_type],
+            ['Revenue',     `$${slideOrder.tokens_spent||0}`],
+            ['Access',      slideOrder.access_point?.replace(/_/g,' ')],
+            ['Fulfillment', slideOrder.fulfillment_type],
+            ['Creator',     slideOrder.creator_name||'None'],
+            ['School',      slideOrder.school_name||'—'],
+            ['Order #',     slideOrder.order_sequence ? `#${slideOrder.order_sequence} for this customer` : '1st order'],
+            ['Reorder',     slideOrder.is_reorder ? 'Yes' : 'No'],
+            ['Addons',      slideOrder.addons && JSON.parse(slideOrder.addons||'[]').join(', ')||'None'],
+            ['Sticker',     slideOrder.sticker_status||'—'],
+            ['Button',      slideOrder.button_status||'—'],
+            ['Holo',        slideOrder.holo_style_name||'—'],
+            ['Date',        new Date(slideOrder.created_at).toLocaleString()],
+          ].map(([k,v])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',
+                                  padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:13}}>
+              <span style={{color:C.muted}}>{k}</span>
+              <span style={{color:C.text,maxWidth:200,textAlign:'right'}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

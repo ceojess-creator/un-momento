@@ -134,6 +134,73 @@ export async function POST(request: Request) {
         }
       }
 
+      // ── Route sticker fulfillment ─────────────────────────
+      if (orderId && meta.sticker_data_url) {
+        // Check booth capacity for sticker routing
+        const { data: eventPage } = await supabase
+          .from('event_pages')
+          .select('id, booth_active')
+          .eq('slug', meta.event_slug || 'grad-2026')
+          .single();
+
+        let stickerStatus = 'queued'; // default to batch
+
+        if (eventPage?.booth_active && meta.fulfillment_type === 'pickup') {
+          // Check Pixcut queue depth
+          const { data: pixcuts } = await supabase
+            .from('event_hardware')
+            .select('queue_depth, max_capacity')
+            .eq('event_id', eventPage.id)
+            .eq('device_type', 'sticker_printer')
+            .eq('is_online', true);
+
+          const totalQueued  = (pixcuts||[]).reduce((s,h) => s+(h.queue_depth||0), 0);
+          const totalCapacity= (pixcuts||[]).reduce((s,h) => s+(h.max_capacity||160), 0);
+
+          if (totalQueued < totalCapacity) {
+            stickerStatus = 'local'; // print at booth immediately
+          }
+        }
+
+        await supabase
+          .from('orders')
+          .update({
+            sticker_status:   stickerStatus,
+            sticker_file_url: meta.sticker_data_url,
+          })
+          .eq('id', orderId);
+
+        // If local — add to print queue
+        if (stickerStatus === 'local' && eventPage) {
+          const { data: pixcut } = await supabase
+            .from('event_hardware')
+            .select('id, asset_tag')
+            .eq('event_id', eventPage.id)
+            .eq('device_type', 'sticker_printer')
+            .eq('is_online', true)
+            .order('queue_depth', { ascending: true })
+            .limit(1)
+            .single();
+
+          if (pixcut) {
+            await supabase.from('print_queue').insert({
+              order_id:      orderId,
+              event_id:      eventPage.id,
+              hardware_id:   pixcut.id,
+              asset_tag:     pixcut.asset_tag,
+              print_type:    'sticker_sheet',
+              file_url:      meta.sticker_data_url,
+              status:        'queued',
+              priority:      5,
+              customer_name: meta.buyer_name || '',
+              customer_phone:meta.buyer_phone || '',
+            });
+          }
+        }
+
+        console.log(`[webhook] sticker routed: ${stickerStatus} for order ${orderId}`);
+      }
+      
       // ── Pickup orders — create assembly record ────────────
       if (meta.fulfillment_type === 'pickup' && orderId) {
         const { data: eventPage } = await supabase

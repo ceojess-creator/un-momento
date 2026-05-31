@@ -170,7 +170,7 @@ interface AdminClientProps {
   contractors:   Contractor[];
 }
 
-type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations';
+type Tab = 'dashboard'|'orders'|'revenue'|'creators'|'applications'|'events'|'inventory'|'operations'|'stickers';
 
 const C = {
   bg:      '#f4f6f8',
@@ -192,6 +192,130 @@ const C = {
   blueBg:  '#eff6ff',
   blueBdr: '#bfdbfe',
 };
+
+function StickerQueuePanel() {
+  const [orders,  setOrders]  = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter,  setFilter]  = useState<'queued'|'batched'|'shipped'|'all'>('queued');
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      try {
+        const res  = await fetch('/api/admin/sticker-queue');
+        const data = await res.json();
+        setOrders(data.orders||[]);
+      } catch(e){ console.error(e); }
+      setLoading(false);
+    }
+    load();
+  },[]);
+
+  async function markShipped(orderId:string, tracking:string){
+    await fetch('/api/admin/sticker-queue',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({order_id:orderId,tracking,status:'shipped'}),
+    });
+    setOrders(p=>p.map(o=>o.id===orderId?{...o,sticker_status:'shipped',sticker_tracking:tracking}:o));
+  }
+
+  const filtered = filter==='all' ? orders : orders.filter(o=>o.sticker_status===filter);
+
+  const statusColor=(s:string)=>
+    s==='shipped'?C.green:s==='batched'?C.blue:s==='local'?C.green:C.amber;
+
+  return (
+    <div>
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:12}}>
+        {(['queued','batched','shipped','all'] as const).map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} style={{
+            padding:'5px 12px',borderRadius:16,cursor:'pointer',
+            background:filter===f?C.green:C.surface,
+            color:filter===f?'#fff':C.muted,
+            border:`1px solid ${filter===f?C.green:C.border}`,
+            fontSize:11,fontWeight:filter===f?600:400,
+            textTransform:'capitalize',
+          }}>{f} ({filter===f?filtered.length:orders.filter(o=>f==='all'?true:o.sticker_status===f).length})</button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p style={{color:C.faint,fontSize:13,textAlign:'center',padding:'32px'}}>Loading...</p>
+      ) : filtered.length===0 ? (
+        <div style={{background:C.greenBg,border:`1px solid ${C.greenBdr}`,
+                     borderRadius:10,padding:'24px',textAlign:'center'}}>
+          <p style={{color:C.green,fontSize:14,fontWeight:500,margin:0}}>
+            {filter==='queued'?'✓ No stickers waiting to batch':'No stickers in this status'}
+          </p>
+        </div>
+      ) : (
+        <div>
+          {filtered.map(o=>(
+            <div key={o.id} style={{
+              background:C.surface,border:`1px solid ${C.border}`,
+              borderRadius:10,padding:'12px 14px',marginBottom:6,
+            }}>
+              <div style={{display:'flex',justifyContent:'space-between',
+                           alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                <div>
+                  <p style={{fontWeight:600,fontSize:13,margin:'0 0 2px',color:C.text}}>
+                    {o.buyer_name}
+                    {o.order_number&&(
+                      <span style={{marginLeft:8,fontSize:11,color:C.green,
+                                    fontFamily:'monospace'}}>#{o.order_number}</span>
+                    )}
+                  </p>
+                  <p style={{fontSize:12,color:C.muted,margin:'0 0 2px'}}>
+                    {o.fulfillment_type==='ship'
+                      ? `Ship to ${o.ship_city}, ${o.ship_state}`
+                      : 'Booth pickup'}
+                  </p>
+                  <p style={{fontSize:11,color:C.faint,margin:0}}>
+                    {o.sticker_batch_date
+                      ? `Batched ${o.sticker_batch_date}`
+                      : new Date(o.created_at).toLocaleDateString()}
+                    {o.sticker_tracking&&` · Tracking: ${o.sticker_tracking}`}
+                  </p>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                  <span style={{
+                    fontSize:11,padding:'2px 8px',borderRadius:10,
+                    color:statusColor(o.sticker_status),
+                    background:statusColor(o.sticker_status)+'22',
+                    border:`1px solid ${statusColor(o.sticker_status)}44`,
+                    fontWeight:600,
+                  }}>{o.sticker_status}</span>
+
+                  {o.sticker_file_url&&(
+                    <a href={o.sticker_file_url} target="_blank" rel="noopener noreferrer"
+                      style={{padding:'4px 10px',background:C.surface,
+                              border:`1px solid ${C.border}`,borderRadius:6,
+                              color:C.text,fontSize:11,textDecoration:'none'}}>
+                      Print file →
+                    </a>
+                  )}
+
+                  {o.sticker_status==='batched'&&(
+                    <button onClick={()=>{
+                      const tracking=prompt(`Enter tracking number for ${o.buyer_name}:`);
+                      if(tracking) markShipped(o.id,tracking);
+                    }} style={{
+                      padding:'4px 10px',background:C.green,
+                      border:'none',borderRadius:6,color:'#fff',
+                      fontSize:11,cursor:'pointer',fontWeight:600,
+                    }}>Mark shipped</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StaffAssignModal({
   events, contractors, staffRoster, onAssign, onRemove, onConfirm,
@@ -595,6 +719,7 @@ export default function AdminClient({
           ['applications', '📋 Applications'],
           ['events',       '📍 Events'      ],
           ['operations',   '🎪 Operations'  ],
+          ['stickers',     '🎨 Stickers'    ],
           ['inventory',    '🏪 Inventory'   ],
         ] as [Tab,string][]).map(([t,lbl])=>(
           <button key={t} onClick={()=>setTab(t)} style={tabStyle(t)}>
@@ -1220,6 +1345,44 @@ export default function AdminClient({
           </div>
         )}
 
+        {/* ── STICKERS ── */}
+        {tab==='stickers'&&(
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',
+                         alignItems:'center',marginBottom:16}}>
+              <div>
+                <p style={{fontSize:11,fontWeight:600,color:C.muted,
+                           letterSpacing:1,textTransform:'uppercase',margin:'0 0 4px'}}>
+                  Sticker print queue
+                </p>
+                <p style={{fontSize:12,color:C.faint,margin:0}}>
+                  In-house Pixcut S1 · nightly batch at 11pm
+                </p>
+              </div>
+              <button
+                onClick={async()=>{
+                  const res=await fetch('/api/cron/sticker-batch',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({secret:process.env.CRON_SECRET||''}),
+                  });
+                  const data=await res.json();
+                  setMessage(data.batched
+                    ? `✓ Batch sent — ${data.batched} sticker sheets`
+                    : '✓ No pending stickers');
+                  setTimeout(()=>setMessage(null),4000);
+                }}
+                style={{padding:'8px 16px',background:C.green,color:'#fff',
+                        border:'none',borderRadius:8,fontSize:12,
+                        fontWeight:600,cursor:'pointer'}}>
+                Run batch now
+              </button>
+            </div>
+
+            <StickerQueuePanel />
+          </div>
+        )}
+        
         {/* ── INVENTORY ── */}
         {tab==='inventory'&&(
           <div>

@@ -257,7 +257,7 @@ export default function GradEventPage() {
           <div>
             <CreatorSearch
               prefilledRef={refParam}
-              onSelect={(creator)=>setSelectedCreator(creator)}
+              onSelect={(creator)=>{ setSelectedCreator(creator); nextStep('creator'); }}
               onSkip={()=>{ setSelectedCreator(null); nextStep('creator'); }}
             />
             <button onClick={()=>prevStep('creator')} style={{

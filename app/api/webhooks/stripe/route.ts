@@ -20,9 +20,7 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
-      body, sig, process.env.STRIPE_WEBHOOK_SECRET
-    );
+    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
     console.error('[webhook] signature error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
@@ -33,7 +31,7 @@ export async function POST(request: Request) {
     const meta    = session.metadata || {};
 
     try {
-      // ── Create order in Supabase ──────────────────────────
+      // ── Create order ──────────────────────────────────────
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -54,40 +52,32 @@ export async function POST(request: Request) {
           media_url:          meta.media_url          || null,
           media_type:         meta.media_type         || null,
           print_preview_url:  meta.print_preview_url  || null,
-          tokens_spent:       session.amount_total
-            ? session.amount_total / 100 : 0,
+          holo_upgrade:       meta.holo_upgrade === 'true',
+          holo_style_sku:     meta.holo_style_sku     || null,
+          holo_style_name:    meta.holo_style_name    || null,
+          tokens_spent:       session.amount_total ? session.amount_total / 100 : 0,
         })
         .select('id')
         .single();
 
-      if (orderError) {
-        console.error('[webhook] order error:', orderError);
-      }
+      if (orderError) console.error('[webhook] order error:', orderError);
 
       const orderId    = order?.id;
       const orderTotal = session.amount_total ? session.amount_total / 100 : 0;
 
-      // ── Credit referral if creator handle present ─────────
+      // ── Credit referral ───────────────────────────────────
       if (meta.referral_code && orderId) {
         const { data: creditResult } = await supabase.rpc('credit_referral', {
           p_order_id:       orderId,
           p_creator_handle: meta.referral_code,
           p_order_total:    orderTotal,
         });
-
         if (creditResult?.success) {
           console.log(`[webhook] credited ${meta.referral_code}: $${creditResult.creator_credit}`);
-        } else {
-          console.error('[webhook] referral credit failed:', creditResult?.error);
         }
       } else if (orderId) {
-        // No creator — credit general fund
         const { data: generalFund } = await supabase
-          .from('accounts')
-          .select('id')
-          .eq('email', 'fund@unmomentoprints.com')
-          .single();
-
+          .from('accounts').select('id').eq('email','fund@unmomentoprints.com').single();
         if (generalFund) {
           await supabase.from('referral_credits').insert({
             referrer_handle:     'general-fund',
@@ -99,10 +89,69 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── Auto-submit ship orders to Prodigi ────────────────
+      // ── Deduct all inventory ──────────────────────────────
+      if (orderId && meta.bundle_id) {
+        try {
+          const addonIds   = JSON.parse(meta.addons || '[]') as string[];
+          const buttonSize = meta.button_size || null;
+          const fulfType   = meta.fulfillment_type || 'ship';
+
+          const { data: deductResult } = await supabase.rpc('deduct_order_inventory', {
+            p_bundle_id:   meta.bundle_id,
+            p_addon_ids:   addonIds,
+            p_button_size: buttonSize,
+            p_fulfillment: fulfType,
+          });
+
+          if (deductResult?.alerts?.length > 0) {
+            console.warn('[webhook] reorder alerts:', JSON.stringify(deductResult.alerts));
+          }
+          console.log(`[webhook] inventory deducted:`, JSON.stringify(deductResult?.deducted));
+        } catch (e) {
+          console.error('[webhook] inventory deduction error:', e);
+        }
+      }
+
+      // ── Holo upgrade inventory deduction ──────────────────
+      if (orderId && meta.holo_upgrade === 'true') {
+        try {
+          let holoSku  = meta.holo_style_sku  || null;
+          let holoName = meta.holo_style_name || '';
+
+          if (!holoSku || holoSku === 'default') {
+            const { data: defaultStyle } = await supabase.rpc('get_default_holo_style');
+            if (defaultStyle?.[0]) {
+              holoSku  = defaultStyle[0].sku;
+              holoName = defaultStyle[0].name;
+            }
+          }
+
+          if (holoSku) {
+            await supabase
+              .from('inventory')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('sku', holoSku);
+
+            // Raw decrement via RPC
+            await supabase.rpc('deduct_addon_inventory', {
+              p_addon_ids: ['holo_upgrade'],
+            });
+
+            await supabase.from('orders').update({
+              holo_style_sku:  holoSku,
+              holo_style_name: holoName,
+            }).eq('id', orderId);
+
+            console.log(`[webhook] holo style assigned: ${holoSku}`);
+          }
+        } catch (e) {
+          console.error('[webhook] holo deduction error:', e);
+        }
+      }
+
+      // ── Prodigi — ship photo print ────────────────────────
       if (meta.fulfillment_type === 'ship' && orderId) {
         const printUrl = meta.print_preview_url;
-
         if (printUrl && meta.ship_address) {
           try {
             const prodigiRes = await fetch(
@@ -127,26 +176,22 @@ export async function POST(request: Request) {
             const prodigiData = await prodigiRes.json();
             console.log(`[webhook] Prodigi submitted:`, prodigiData.prodigi_order_id || prodigiData.error);
           } catch (e) {
-            console.error('[webhook] Prodigi submission failed:', e);
+            console.error('[webhook] Prodigi failed:', e);
           }
-        } else {
-          console.log(`[webhook] ship order ${orderId} — no print URL yet, manual fulfillment needed`);
         }
       }
 
       // ── Route sticker fulfillment ─────────────────────────
       if (orderId && meta.sticker_data_url) {
-        // Check booth capacity for sticker routing
         const { data: eventPage } = await supabase
           .from('event_pages')
           .select('id, booth_active')
           .eq('slug', meta.event_slug || 'grad-2026')
           .single();
 
-        let stickerStatus = 'queued'; // default to batch
+        let stickerStatus = 'queued';
 
         if (eventPage?.booth_active && meta.fulfillment_type === 'pickup') {
-          // Check Pixcut queue depth
           const { data: pixcuts } = await supabase
             .from('event_hardware')
             .select('queue_depth, max_capacity')
@@ -154,37 +199,16 @@ export async function POST(request: Request) {
             .eq('device_type', 'sticker_printer')
             .eq('is_online', true);
 
-          const totalQueued  = (pixcuts||[]).reduce((s,h) => s+(h.queue_depth||0), 0);
-          const totalCapacity= (pixcuts||[]).reduce((s,h) => s+(h.max_capacity||160), 0);
-
-          if (totalQueued < totalCapacity) {
-            stickerStatus = 'local'; // print at booth immediately
-          }
+          const totalQueued   = (pixcuts||[]).reduce((s,h) => s+(h.queue_depth||0), 0);
+          const totalCapacity = (pixcuts||[]).reduce((s,h) => s+(h.max_capacity||160), 0);
+          if (totalQueued < totalCapacity) stickerStatus = 'local';
         }
 
-        await supabase
-          .from('orders')
-          .update({
-            sticker_status:   stickerStatus,
-            sticker_file_url: meta.sticker_data_url,
-          })
-          .eq('id', orderId);
+        await supabase.from('orders').update({
+          sticker_status:   stickerStatus,
+          sticker_file_url: meta.sticker_data_url,
+        }).eq('id', orderId);
 
-        // ── Route button fulfillment ──────────────────────────
-      if (orderId && meta.button_design_url && meta.button_size) {
-        await supabase
-          .from('orders')
-          .update({
-            button_status:   'queued',
-            button_file_url: meta.button_design_url,
-            button_size:     meta.button_size,
-          })
-          .eq('id', orderId);
-
-        console.log(`[webhook] button queued for batch: order ${orderId}`);
-      }
-      
-      // If local — add to print queue
         if (stickerStatus === 'local' && eventPage) {
           const { data: pixcut } = await supabase
             .from('event_hardware')
@@ -206,84 +230,85 @@ export async function POST(request: Request) {
               file_url:      meta.sticker_data_url,
               status:        'queued',
               priority:      5,
-              customer_name: meta.buyer_name || '',
+              customer_name: meta.buyer_name  || '',
               customer_phone:meta.buyer_phone || '',
             });
           }
         }
-
-        console.log(`[webhook] sticker routed: ${stickerStatus} for order ${orderId}`);
+        console.log(`[webhook] sticker routed: ${stickerStatus}`);
       }
-      
-      // ── Pickup orders — create assembly record ────────────
+
+      // ── Route button to batch queue ───────────────────────
+      if (orderId && meta.button_design_url && meta.button_size) {
+        await supabase.from('orders').update({
+          button_status:   'queued',
+          button_file_url: meta.button_design_url,
+          button_size:     meta.button_size,
+        }).eq('id', orderId);
+        console.log(`[webhook] button queued for batch: order ${orderId}`);
+      }
+
+      // ── Pickup — create assembly record ──────────────────
       if (meta.fulfillment_type === 'pickup' && orderId) {
         const { data: eventPage } = await supabase
-          .from('event_pages')
-          .select('id')
-          .eq('slug', meta.event_slug || 'grad-2026')
-          .single();
+          .from('event_pages').select('id')
+          .eq('slug', meta.event_slug || 'grad-2026').single();
 
         if (eventPage) {
+          const addonIds = JSON.parse(meta.addons || '[]') as string[];
+          const physicalAddons = addonIds.filter(id =>
+            ['metallic_marker','oil_marker','card_jacket','holo_upgrade'].includes(id)
+          );
+          const packNote = physicalAddons.length > 0
+            ? `Pack: ${physicalAddons.map(id =>
+                id==='metallic_marker'?'Metallic Marker':
+                id==='oil_marker'?'Oil Marker':
+                id==='card_jacket'?'Card Jacket':
+                id==='holo_upgrade'?'Holo Film':id
+              ).join(', ')}`
+            : null;
+
           await supabase.from('order_assembly').upsert({
             order_id:        orderId,
             event_id:        eventPage.id,
             status:          'pending',
-            items_expected:  1,
+            items_expected:  1 + physicalAddons.length,
             pickup_location: 'Un Momento booth — see Hand-off Associate',
+            notes:           packNote,
           }, { onConflict: 'order_id' });
         }
       }
 
-      // ── Deduct physical add-on inventory ─────────────────
-      if (orderId && meta.addons) {
-        try {
-          const addonIds = JSON.parse(meta.addons || '[]') as string[];
-          const physicalAddons = addonIds.filter(id =>
-            ['metallic_marker','oil_marker','card_jacket'].includes(id)
-          );
+      // ── Ship — packing list for physical add-ons ─────────
+      if (meta.fulfillment_type === 'ship' && orderId) {
+        const addonIds = JSON.parse(meta.addons || '[]') as string[];
+        const physicalAddons = addonIds.filter(id =>
+          ['metallic_marker','oil_marker','card_jacket','holo_upgrade'].includes(id)
+        );
+        if (physicalAddons.length > 0) {
+          const packNote = `Pack with print: ${physicalAddons.map(id =>
+            id==='metallic_marker'?'Metallic Marker':
+            id==='oil_marker'?'Oil Marker':
+            id==='card_jacket'?'Card Jacket':
+            id==='holo_upgrade'?`Holo Film (${meta.holo_style_name||'auto'})`:id
+          ).join(', ')}`;
 
-          if (physicalAddons.length > 0) {
-            const { data: deductResult } = await supabase.rpc('deduct_addon_inventory', {
-              p_addon_ids: physicalAddons,
-            });
-
-            // Log reorder alerts
-            if (deductResult?.alerts?.length > 0) {
-              console.warn('[webhook] inventory reorder alerts:', deductResult.alerts);
-            }
-
-            // Add physical add-ons to packing list
-            await supabase.from('order_assembly').upsert({
-              order_id:        orderId,
-              event_id:        null,
-              status:          'pending',
-              items_expected:  physicalAddons.length + 1, // +1 for print
-              pickup_location: meta.fulfillment_type === 'pickup'
-                ? 'Un Momento booth'
-                : 'Ship with print',
-              notes: `Pack with order: ${physicalAddons.map(id =>
-                id==='metallic_marker' ? 'Metallic Marker' :
-                id==='oil_marker'      ? 'Oil Marker' :
-                id==='card_jacket'     ? 'Black Card Jacket' : id
-              ).join(', ')}`,
-            }, { onConflict: 'order_id' });
-
-            console.log(`[webhook] deducted inventory for: ${physicalAddons.join(', ')}`);
-          }
-        } catch (e) {
-          console.error('[webhook] inventory deduction error:', e);
+          await supabase.from('order_assembly').upsert({
+            order_id:        orderId,
+            event_id:        null,
+            status:          'pending',
+            items_expected:  physicalAddons.length + 1,
+            pickup_location: 'Ship with print',
+            notes:           packNote,
+          }, { onConflict: 'order_id' });
         }
       }
-      
+
       // ── Create or link buyer account ──────────────────────
       const buyerEmail = meta.buyer_email || session.customer_email;
       if (buyerEmail) {
         const { data: existingAccount } = await supabase
-          .from('accounts')
-          .select('id')
-          .eq('email', buyerEmail)
-          .single();
-
+          .from('accounts').select('id').eq('email', buyerEmail).single();
         if (!existingAccount) {
           await supabase.from('accounts').insert({
             name:            meta.buyer_name || buyerEmail.split('@')[0],

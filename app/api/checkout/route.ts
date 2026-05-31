@@ -129,6 +129,9 @@ export async function POST(request: Request) {
         sticker_data_url:  body.sticker_data?.dataUrl?.slice(0, 490) || '',
         button_design_url: body.button_design?.dataUrl?.slice(0, 490) || '',
         button_size:       body.button_size || '',
+        holo_upgrade:    body.holo_upgrade    ? 'true' : '',
+        holo_style_sku:  body.holo_style_sku  || '',
+        holo_style_name: body.holo_style_name || '',
       },
     });
 

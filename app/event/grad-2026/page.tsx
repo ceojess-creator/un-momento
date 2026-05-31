@@ -44,12 +44,24 @@ const BUTTON_SIZES = [
 ];
 
 const ADDONS = [
-  { id:'qr_video',        name:'QR Video Memory Upgrade', price:10 },
-  { id:'card_jacket',     name:'Black Card Jacket',        price:5  },
-  { id:'metallic_marker', name:'Metallic Marker',          price:4  },
-  { id:'oil_marker',      name:'Oil-Based Marker',         price:4  },
-  { id:'extra_print',     name:'Extra Photo Print',        price:10 },
-  { id:'extra_sticker',   name:'Extra Sticker Sheet',      price:12 },
+  { id:'qr_video',        name:'QR Video Memory Upgrade',      price:10 },
+  { id:'card_jacket',     name:'Black Card Jacket',             price:5  },
+  { id:'metallic_marker', name:'Metallic Marker',               price:4  },
+  { id:'oil_marker',      name:'Oil-Based Marker',              price:4  },
+  { id:'extra_print',     name:'Extra Photo Print',             price:10 },
+  { id:'extra_sticker',   name:'Extra Sticker Sheet',           price:12 },
+  { id:'holo_upgrade',    name:'Holographic Button Upgrade',    price:2  },
+];
+
+const HOLO_STYLES = [
+  { id:'HOLO-RAINBOW-MULTI',  name:'Rainbow Multi',      emoji:'🌈' },
+  { id:'HOLO-RAINBOW-SILVER', name:'Rainbow Silver',     emoji:'✨' },
+  { id:'HOLO-STAR-SMALL-1',   name:'Small Star 1',       emoji:'⭐' },
+  { id:'HOLO-STAR-SMALL-2',   name:'Small Star 2',       emoji:'🌟' },
+  { id:'HOLO-STAR-LARGE',     name:'Large Star',         emoji:'💫' },
+  { id:'HOLO-HEARTS',         name:'Hearts',             emoji:'❤️' },
+  { id:'HOLO-GLITTER',        name:'All Over Glitter',   emoji:'💎' },
+  { id:'HOLO-PRISMATIC',      name:'Prismatic',          emoji:'🔮' },
 ];
 
 type Step = 'bundle'|'creator'|'media'|'design'|'sticker'|'button'|'fulfillment'|'details'|'review';
@@ -65,6 +77,8 @@ export default function GradEventPage() {
   const [buttonSize,      setButtonSize]      = useState<string|null>(null);
   const [buttonDesign,    setButtonDesign]    = useState<any>(null);
   const [showButtonStudio,setShowButtonStudio]= useState(false);
+  const [holoStyle,       setHoloStyle]       = useState<string|null>(null);
+  const [holoStyleName,   setHoloStyleName]   = useState<string>('');
   const [fulfillment,     setFulfillment]     = useState<'ship'|'pickup'>('ship');
   const [boothActive,     setBoothActive]     = useState(false);
   const [loading,         setLoading]         = useState(false);
@@ -155,6 +169,9 @@ export default function GradEventPage() {
           button_size:      buttonSize,
           button_design:    buttonDesign,
           button_design_url: buttonDesign?.dataUrl || null,
+          holo_upgrade:    addons.includes('holo_upgrade'),
+          holo_style_sku:  holoStyle === 'default' ? null : holoStyle,
+          holo_style_name: holoStyleName || null,
         }),
       });
       const data = await res.json();
@@ -331,9 +348,58 @@ export default function GradEventPage() {
                     {BUTTON_SIZES.find(s=>s.id===buttonSize)?.label}
                   </p>
                 </div>
+                {/* Holo upgrade selector */}
+                {addons.includes('holo_upgrade') && (
+                  <div style={{marginBottom:16}}>
+                    <p style={{fontSize:13,fontWeight:500,margin:'0 0 8px',color:'#fff'}}>
+                      ✨ Choose your holographic style
+                    </p>
+                    <p style={{fontSize:11,color:'#888',margin:'0 0 10px'}}>
+                      No preference? We'll use whichever style has the most stock.
+                    </p>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:6}}>
+                      {HOLO_STYLES.map(s=>(
+                        <div key={s.id} onClick={()=>{setHoloStyle(s.id);setHoloStyleName(s.name);}}
+                          style={{
+                            padding:'10px 12px',borderRadius:8,cursor:'pointer',
+                            border:holoStyle===s.id?'2px solid #4ADE80':'1px solid #333',
+                            background:holoStyle===s.id?'#0d1f0d':'#111',
+                            display:'flex',alignItems:'center',gap:8,
+                          }}>
+                          <span style={{fontSize:20}}>{s.emoji}</span>
+                          <span style={{fontSize:12,color:holoStyle===s.id?'#4ADE80':'#888',fontWeight:holoStyle===s.id?600:400}}>
+                            {s.name}
+                          </span>
+                          {holoStyle===s.id&&<span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>}
+                        </div>
+                      ))}
+                      <div onClick={()=>{setHoloStyle('default');setHoloStyleName('Surprise me');}}
+                        style={{
+                          padding:'10px 12px',borderRadius:8,cursor:'pointer',
+                          border:holoStyle==='default'?'2px solid #4ADE80':'1px dashed #333',
+                          background:holoStyle==='default'?'#0d1f0d':'transparent',
+                          display:'flex',alignItems:'center',gap:8,
+                          gridColumn:'1/-1',
+                        }}>
+                        <span style={{fontSize:20}}>🎲</span>
+                        <span style={{fontSize:12,color:holoStyle==='default'?'#4ADE80':'#666'}}>
+                          Surprise me — use highest stock style
+                        </span>
+                        {holoStyle==='default'&&<span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{display:'flex', gap:8}}>
                   <button onClick={()=>{ setButtonDesign(null); setShowButtonStudio(true); }} style={{flex:1, padding:12, border:'1px solid #333', borderRadius:10, background:'transparent', color:'#fff', fontSize:14, cursor:'pointer'}}>Redesign</button>
-                  <button onClick={()=>nextStep('button')} style={{flex:2, padding:12, background:'#4ADE80', color:'#000', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer'}}>Continue</button>
+                  <button onClick={()=>{
+                    if(addons.includes('holo_upgrade') && !holoStyle) {
+                      setHoloStyle('default');
+                      setHoloStyleName('Surprise me');
+                    }
+                    nextStep('button');
+                  }} style={{flex:2, padding:12, background:'#4ADE80', color:'#000', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer'}}>Continue</button>
                 </div>
               </div>
             ) : (

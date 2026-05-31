@@ -1720,6 +1720,11 @@ export default function AdminClient({
           </div>
         )}
 
+      </div>
+    </main>
+  );
+}
+
 function CampaignDashboard() {
   const [summary,   setSummary]   = useState<any>(null);
   const [items,     setItems]     = useState<any>(null);

@@ -4,6 +4,7 @@ import CollageEditor  from '@/app/components/CollageEditor';
 import MemoryRecorder from '@/app/components/MediaRecorder';
 import StickerStudio  from '@/app/components/StickerStudio';
 import CreatorSearch  from '@/app/components/CreatorSearch';
+import ButtonStudio   from '@/app/components/ButtonStudio';
 
 const BUNDLES = [
   {
@@ -341,61 +342,67 @@ export default function GradEventPage() {
               </div>
             )}
 
-            {/* Button photo upload */}
-            {buttonSize && (
-              <div style={{ marginTop:16, background:'#111', borderRadius:12, padding:'16px', border:'1px solid #222' }}>
-                <p style={{ fontSize:13, fontWeight:500, margin:'0 0 10px' }}>
-                  Upload your button/magnet photo
+            {/* STEP: BUTTON / MAGNET / KEYCHAIN */}
+        {step==='button' && (
+          <div>
+            {!buttonSize ? (
+              <div>
+                <p style={{ fontSize:14, fontWeight:500, margin:'0 0 16px' }}>
+                  Choose your button, magnet, or keychain size
                 </p>
-                <p style={{ fontSize:12, color:'#888', margin:'0 0 12px', lineHeight:1.6 }}>
-                  This photo will be printed on your {BUTTON_SIZES.find(s=>s.id===buttonSize)?.label}.
-                  Round photos will be cropped to fit the shape automatically.
-                </p>
-                <label style={{
-                  display:'block', padding:'20px', border: buttonDesign?'1px solid #4ADE80':'1px dashed #333',
-                  borderRadius:10, textAlign:'center', cursor:'pointer',
-                  background: buttonDesign?'#0d1f0d':'transparent',
-                }}>
-                  <input type="file" accept="image/*" style={{ display:'none' }}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const url = URL.createObjectURL(file);
-                      setButtonDesign({ file, url, size: buttonSize });
-                    }}
-                  />
-                  {buttonDesign
-                    ? <p style={{ color:'#4ADE80', margin:0, fontSize:13 }}>✓ Photo uploaded — {BUTTON_SIZES.find(s=>s.id===buttonSize)?.label}</p>
-                    : <p style={{ color:'#555', margin:0, fontSize:13 }}>Tap to upload button photo</p>
-                  }
-                </label>
-
-                {buttonDesign?.url && (
-                  <div style={{ marginTop:12, textAlign:'center' }}>
-                    <img src={buttonDesign.url} alt="button preview"
-                      style={{
-                        width:100, height:100,
-                        borderRadius: buttonSize?.includes('circle')||buttonSize?.includes('keychain') ? '50%' : '8px',
-                        objectFit:'cover',
-                        border:'2px solid #4ADE80',
-                        display:'inline-block',
-                      }}
-                    />
-                    <p style={{ fontSize:11, color:'#888', margin:'6px 0 0' }}>Preview</p>
+                {BUTTON_SIZES.map(s => (
+                  <div key={s.id} onClick={() => setButtonSize(s.id)} style={{
+                    border: buttonSize===s.id ? '2px solid #4ADE80' : '1px solid #222',
+                    borderRadius:12, padding:'14px 16px', marginBottom:8,
+                    cursor:'pointer', background:buttonSize===s.id?'#0d1f0d':'#111',
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <div>
+                        <p style={{ fontWeight:600, fontSize:14, margin:'0 0 3px' }}>{s.label}</p>
+                        <p style={{ fontSize:12, color:'#888', margin:0 }}>
+                          {s.hasQR ? '✓ QR memory code on back face' : '⚠️ Too small for QR code — no QR available'}
+                        </p>
+                      </div>
+                      {buttonSize===s.id && <span style={{ color:'#4ADE80', fontSize:18 }}>✓</span>}
+                    </div>
+                  </div>
+                ))}
+                {buttonSize && !BUTTON_SIZES.find(s=>s.id===buttonSize)?.hasQR && (
+                  <div style={{ background:'#2a1a00', border:'1px solid #BA7517', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#BA7517', margin:'8px 0' }}>
+                    ⚠️ 32mm products are too small for a scannable QR code.
                   </div>
                 )}
+                <div style={{ display:'flex', gap:8, marginTop:16 }}>
+                  <button onClick={() => prevStep('button')} style={{ flex:1, padding:12, border:'1px solid #333', borderRadius:10, background:'transparent', color:'#fff', fontSize:14, cursor:'pointer' }}>← Back</button>
+                  <button onClick={() => buttonSize && setButtonSize(buttonSize)} disabled={!buttonSize} style={{ flex:2, padding:12, background:buttonSize?'#4ADE80':'#333', color:buttonSize?'#000':'#888', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:buttonSize?'pointer':'not-allowed' }}>
+                    Design my {BUTTON_SIZES.find(s=>s.id===buttonSize)?.label||'button'} →
+                  </button>
+                </div>
+              </div>
+            ) : !buttonDesign ? (
+              <ButtonStudio
+                productId={buttonSize}
+                onComplete={(dataUrl, pid) => {
+                  setButtonDesign({ dataUrl, productId: pid });
+                  nextStep('button');
+                }}
+                onBack={() => setButtonSize(null)}
+              />
+            ) : (
+              <div>
+                <div style={{ background:'#0d1f0d', border:'1px solid #4ADE80', borderRadius:12, padding:'16px', textAlign:'center', marginBottom:16 }}>
+                  <p style={{ color:'#4ADE80', fontWeight:600, fontSize:15, margin:'0 0 8px' }}>✓ Button design ready</p>
+                  <img src={buttonDesign.dataUrl} alt="button preview"
+                    style={{ width:100, height:100, borderRadius:'50%', objectFit:'cover', border:'2px solid #4ADE80', display:'inline-block' }}
+                  />
+                  <p style={{ fontSize:12, color:'#888', margin:'8px 0 0' }}>{BUTTON_SIZES.find(s=>s.id===buttonSize)?.label}</p>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => setButtonDesign(null)} style={{ flex:1, padding:12, border:'1px solid #333', borderRadius:10, background:'transparent', color:'#fff', fontSize:14, cursor:'pointer' }}>↺ Redesign</button>
+                  <button onClick={() => nextStep('button')} style={{ flex:2, padding:12, background:'#4ADE80', color:'#000', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer' }}>Continue →</button>
+                </div>
               </div>
             )}
-
-            <div style={{ display:'flex', gap:8, marginTop:16 }}>
-              <button onClick={() => prevStep('button')} style={{ flex:1, padding:12, border:'1px solid #333', borderRadius:10, background:'transparent', color:'#fff', fontSize:14, cursor:'pointer' }}>← Back</button>
-              <button
-                onClick={() => buttonSize && nextStep('button')}
-                disabled={!buttonSize}
-                style={{ flex:2, padding:12, background:buttonSize?'#4ADE80':'#333', color:buttonSize?'#000':'#888', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:buttonSize?'pointer':'not-allowed' }}>
-                Continue →
-              </button>
-            </div>
           </div>
         )}
 

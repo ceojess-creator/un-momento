@@ -256,8 +256,9 @@ export default function GradEventPage() {
       });
       const data = await res.json();
       if (data.url) {
-        clearCart();
         window.location.href = data.url;
+        // Clear cart after redirect initiated
+        setTimeout(() => clearCart(), 1000);
       }
     } catch(err) { console.error(err); }
     setLoading(false);
@@ -992,10 +993,20 @@ export default function GradEventPage() {
               value={form.email} onChange={e=>setField('email',e.target.value)}/>
             <input style={inp} placeholder="Phone number"
               value={form.phone} onChange={e=>setField('phone',e.target.value)}/>
-            <input style={inp} placeholder="Graduate name"
-              value={form.grad_name} onChange={e=>setField('grad_name',e.target.value)}/>
-            <input style={inp} placeholder="School name (optional)"
-              value={form.school} onChange={e=>setField('school',e.target.value)}/>
+            {/* Show creator info from cart items */}
+            {cartState.items.some(i=>i.creatorName) && (
+              <div style={{background:'#0d1f0d',border:'1px solid #1a3a1a',
+                           borderRadius:8,padding:'10px 14px'}}>
+                <p style={{fontSize:12,color:'#4ADE80',margin:0}}>
+                  Supporting:{' '}
+                  {cartState.items
+                    .filter(i=>i.creatorName)
+                    .map(i=>i.creatorName)
+                    .filter((v,i,a)=>a.indexOf(v)===i)
+                    .join(', ')}
+                </p>
+              </div>
+            )}
 
             {cartState.items.some(i=>i.fulfillment==='ship') && (
               <>

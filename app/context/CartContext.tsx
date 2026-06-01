@@ -139,10 +139,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  const cartTotal = state.items.reduce(
-    (sum, item) => sum + item.bundlePrice + item.addonTotal + (item.dropQR ? 5 : 0),
-    0
-  );
+  const ADDON_PRICES: Record<string,number> = {
+    qr_video:10, card_jacket:5, metallic_marker:4,
+    oil_marker:4, extra_print:10, extra_sticker:12, holo_upgrade:2,
+  };
+
+  const cartTotal = state.items.reduce((sum, item) => {
+    const addonSum = (item.addons||[]).reduce(
+      (s,id) => s + (ADDON_PRICES[id]||0), 0
+    );
+    return sum + item.bundlePrice + addonSum + (item.dropQR ? 5 : 0);
+  }, 0);
 
   const cartCount = state.items.length;
 

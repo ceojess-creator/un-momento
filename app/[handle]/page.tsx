@@ -12,17 +12,23 @@ export default async function CreatorPage({
 }: {
   params: { handle: string };
 }) {
-  const { handle } = params;
+  const { handle } = await params;
 
-  // Fetch creator profile
-  const { data: creator } = await supabase
+  console.log('[storefront] looking up handle:', handle);
+
+  const { data: creator, error } = await supabase
     .from('creator_profiles')
     .select('*')
     .eq('handle', handle)
     .eq('is_active', true)
     .single();
 
-  if (!creator) notFound();
+  console.log('[storefront] creator:', creator?.display_name, 'error:', error?.message);
+
+  if (!creator) {
+    console.log('[storefront] not found — returning 404');
+    notFound();
+  }
 
   // Fetch school separately
   let school = null;
@@ -42,14 +48,14 @@ export default async function CreatorPage({
     .eq('creator_handle', handle)
     .single();
 
-  // Fetch school total (all creators at same school)
+  // Fetch school total
   const { data: schoolStats } = await supabase
     .from('fundraiser_summary')
     .select('*')
     .eq('school_id', creator.school_id)
     .single();
 
-  // Fetch creator rank at school
+  // Fetch creator rank
   const { data: schoolCreators } = await supabase
     .from('creator_profiles')
     .select('handle, total_donated')
@@ -64,7 +70,7 @@ export default async function CreatorPage({
       creator={creator}
       school={school}
       campaignStats={campaignStats || null}
-      schoolStats={schoolStats   || null}
+      schoolStats={schoolStats    || null}
       rank={rank}
     />
   );
@@ -75,10 +81,11 @@ export async function generateMetadata({
 }: {
   params: { handle: string };
 }) {
+  const { handle } = await params;
   const { data: creator } = await supabase
     .from('creator_profiles')
     .select('display_name, school_id')
-    .eq('handle', params.handle)
+    .eq('handle', handle)
     .single();
 
   if (!creator) return { title: 'Creator | Un Momento' };
@@ -96,9 +103,5 @@ export async function generateMetadata({
   return {
     title: `${creator.display_name} · Un Momento`,
     description: `Support ${creator.display_name} — 10% of your order goes to ${schoolName}.`,
-    openGraph: {
-      title: `Support ${creator.display_name} on Un Momento`,
-      description: `Order graduation prints and 10% goes to ${schoolName}'s PTSO.`,
-    },
   };
 }

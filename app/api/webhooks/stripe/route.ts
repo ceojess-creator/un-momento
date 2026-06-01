@@ -29,7 +29,136 @@ export async function POST(request: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const meta    = session.metadata || {};
+      // ── Handle cart orders (multiple items) ───────────────
+      if (meta.is_cart === 'true') {
+        const cartItemCount = parseInt(meta.cart_item_count || '1');
+        const orderTotal    = session.amount_total ? session.amount_total / 100 : 0;
 
+        for (let i = 0; i < cartItemCount; i++) {
+          const bundleId   = meta[`item_${i}_bundle`]      || '';
+          const creator    = meta[`item_${i}_creator`]     || null;
+          const fulfType   = meta[`item_${i}_fulfillment`] || 'ship';
+          const addonsStr  = meta[`item_${i}_addons`]      || '[]';
+          const mediaUrl   = meta[`item_${i}_media_url`]   || null;
+          const mediaType  = meta[`item_${i}_media_type`]  || null;
+          const buttonSize = meta[`item_${i}_button_size`] || null;
+          const holoSku    = meta[`item_${i}_holo_sku`]    || null;
+          const holoName   = meta[`item_${i}_holo_name`]   || null;
+          const printUrl   = meta[`item_${i}_print_url`]   || null;
+          const stickerUrl = meta[`item_${i}_sticker_url`] || null;
+          const buttonUrl  = meta[`item_${i}_button_url`]  || null;
+          const printCount = parseInt(meta[`item_${i}_print_count`] || '1');
+          const dropQR     = meta[`item_${i}_drop_qr`] === 'true';
+
+          try {
+            const { data: cartOrder } = await supabase
+              .from('orders')
+              .insert({
+                buyer_name:         meta.buyer_name   || session.customer_details?.name || '',
+                buyer_email:        meta.buyer_email  || session.customer_email || '',
+                buyer_phone:        meta.buyer_phone  || '',
+                ship_address:       meta.ship_address || '',
+                ship_city:          meta.ship_city    || '',
+                ship_state:         meta.ship_state   || '',
+                ship_zip:           meta.ship_zip     || '',
+                product_type:       bundleId,
+                stripe_payment_id:  session.payment_intent as string,
+                fulfillment_type:   fulfType,
+                fulfillment_source: fulfType === 'pickup' ? 'local' : 'prodigi',
+                fulfillment_status: fulfType === 'pickup' ? 'queued' : 'pending',
+                campaign_slug:      meta.event_slug || 'grad-2026',
+                referral_code:      creator || null,
+                media_url:          mediaUrl,
+                media_type:         mediaType,
+                print_preview_url:  printUrl,
+                sticker_file_url:   stickerUrl || null,
+                sticker_status:     stickerUrl ? 'queued' : null,
+                button_file_url:    buttonUrl  || null,
+                button_status:      buttonUrl  ? 'queued' : null,
+                button_size:        buttonSize,
+                holo_upgrade:       !!holoSku,
+                holo_style_sku:     holoSku,
+                holo_style_name:    holoName,
+                print_count:        printCount,
+                addons:             addonsStr,
+                tokens_spent:       orderTotal / cartItemCount,
+              })
+              .select('id')
+              .single();
+
+            const cartOrderId = cartOrder?.id;
+            if (!cartOrderId) continue;
+
+            // Credit referral
+            if (creator && cartOrderId) {
+              await supabase.rpc('credit_referral', {
+                p_order_id:       cartOrderId,
+                p_creator_handle: creator,
+                p_order_total:    orderTotal / cartItemCount,
+              });
+            }
+
+            // Submit to Prodigi if ship
+            if (fulfType === 'ship' && printUrl && meta.ship_address) {
+              await fetch(
+                `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
+                {
+                  method:  'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    order_id:        cartOrderId,
+                    print_url:       printUrl,
+                    quantity:        printCount,
+                    recipient_name:  meta.buyer_name   || '',
+                    recipient_email: meta.buyer_email  || '',
+                    recipient_phone: meta.buyer_phone  || '',
+                    address_line1:   meta.ship_address || '',
+                    city:            meta.ship_city    || '',
+                    state:           meta.ship_state   || '',
+                    zip:             meta.ship_zip     || '',
+                    bundle_id:       bundleId,
+                  }),
+                }
+              );
+            }
+
+            // Classify order
+            const buyerEmail = meta.buyer_email || session.customer_email || '';
+            if (buyerEmail && bundleId) {
+              await supabase.rpc('classify_order', {
+                p_order_id:    cartOrderId,
+                p_buyer_email: buyerEmail,
+                p_bundle_id:   bundleId,
+                p_is_onsite:   fulfType === 'pickup',
+              });
+            }
+
+            console.log(`[webhook] cart item ${i+1}/${cartItemCount} created: ${cartOrderId}`);
+          } catch (itemErr: any) {
+            console.error(`[webhook] cart item ${i} error:`, itemErr.message);
+          }
+        }
+
+        // Create/link buyer account
+        const buyerEmail = meta.buyer_email || session.customer_email;
+        if (buyerEmail) {
+          const { data: existing } = await supabase
+            .from('accounts').select('id').eq('email', buyerEmail).single();
+          if (!existing) {
+            await supabase.from('accounts').insert({
+              name:            meta.buyer_name || buyerEmail.split('@')[0],
+              email:           buyerEmail,
+              phone:           meta.buyer_phone || '',
+              is_creator:      false,
+              onboarding_step: 'claim',
+            });
+          }
+        }
+
+        console.log(`[webhook] cart order complete — ${meta.cart_item_count} items`);
+        return NextResponse.json({ received: true });
+      }
+      
     try {
       // ── Create order ──────────────────────────────────────
       const { data: order, error: orderError } = await supabase

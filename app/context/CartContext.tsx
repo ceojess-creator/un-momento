@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from 'react';
 
 export interface CartItem {
   cartId:       string;
@@ -98,6 +98,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     editingId: null,
   });
 
+  const mountedRef = useRef(false);
+
+  // Load from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -108,9 +111,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('[cart] load error:', e);
     }
+    mountedRef.current = true;
   }, []);
 
+  // Save to localStorage — only after mount
   useEffect(() => {
+    if (!mountedRef.current) return;
     try {
       if (state.items.length > 0) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeCart(state.items)));

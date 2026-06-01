@@ -104,6 +104,7 @@ export default function AccountClient({
     ? account.creator_profiles[0]
     : account.creator_profiles;
   const handle      = creatorProfile?.handle;
+  const schoolName  = (creatorProfile as any)?.schools?.name || creatorProfile?.school_name || '';
   const earnings    = creatorProfile?.earnings_balance || 0;
   const totalEarned = creatorProfile?.total_earned     || 0;
   const donated     = creatorProfile?.total_donated    || 0;
@@ -195,7 +196,7 @@ export default function AccountClient({
                 )}
               </p>
               <p style={{fontSize:12,color:C.muted,margin:0}}>
-                Spring 2026 · {creatorProfile?.school_name||'No school linked'}
+                Spring 2026 · {schoolName||'No school linked'}
               </p>
             </div>
             <a href="/creator/dashboard" style={{
@@ -521,7 +522,7 @@ export default function AccountClient({
                 Spring 2026 campaign
               </p>
               <p style={{fontSize:13,color:C.muted,margin:'0 0 12px',lineHeight:1.6}}>
-                April 1 – June 30, 2026 · {creatorProfile?.school_name||'No school'}
+                April 1 – June 30, 2026 · {schoolName||'No school linked'}
               </p>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
                 {[

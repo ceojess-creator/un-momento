@@ -17,7 +17,7 @@ export default async function AccountPage() {
   // Get or create account
   let { data: account } = await supabase
     .from('accounts')
-    .select('*, token_wallets(*), creator_profiles!creator_profiles_account_id_fkey(*)')
+    .select('*, token_wallets(*), creator_profiles!creator_profiles_account_id_fkey(*, schools(name, city, state_abbr))')
     .eq('email', email)
     .single();
 

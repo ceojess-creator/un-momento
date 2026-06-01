@@ -202,6 +202,8 @@ export default function GradEventPage() {
       isMulti:       b.isMulti,
     };
 
+    console.log('[cart] adding item:', item.bundleId, item.bundlePrice, 'addons:', item.addons);
+    
     addItem(item);
 
     // Reset item state
@@ -229,6 +231,8 @@ export default function GradEventPage() {
   async function handleCheckout() {
     setLoading(true);
     try {
+      console.log('[cart] checkout — items:', cartState.items.length, 'total:', cartTotal);
+      console.log('[cart] items detail:', JSON.stringify(cartState.items.map(i=>({id:i.bundleId,price:i.bundlePrice,addons:i.addons}))));
       // Upload media files (stored as blob URLs — re-fetch them)
       const itemsWithUrls = await Promise.all(
         cartState.items.map(async (item) => {
@@ -404,6 +408,10 @@ export default function GradEventPage() {
                       <button onClick={()=>{
                         setShowCart(false);
                         setStep('details');
+                        // Force localStorage sync
+                        setTimeout(()=>{
+                          console.log('[cart] items at checkout:', cartState.items.length, JSON.stringify(cartState.items).slice(0,200));
+                        }, 100);
                       }} style={{
                         width:'100%', padding:'12px',
                         background:'#4ADE80', color:'#000', border:'none',

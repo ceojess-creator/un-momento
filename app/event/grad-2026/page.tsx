@@ -53,13 +53,13 @@ const BUNDLES = [
 ];
 
 const BUTTON_SIZES = [
-  { id:'56mm_circle',   label:'56mm Circle',         hasQR:true,  price:0 },
-  { id:'50mm_square',   label:'50mm Square',          hasQR:true,  price:0 },
-  { id:'32mm_circle',   label:'32mm Circle',          hasQR:false, price:0 },
-  { id:'56mm_magnet',   label:'56mm Magnet',          hasQR:true,  price:0 },
-  { id:'32mm_magnet',   label:'32mm Magnet',          hasQR:false, price:0 },
-  { id:'keychain_oval', label:'Keychain (40mm oval)', hasQR:true,  price:0 },
-  { id:'keychain_rect', label:'Keychain (35x45mm)',   hasQR:true,  price:0 },
+  { id:'56mm_circle',   label:'56mm Circle',         hasQR:true  },
+  { id:'50mm_square',   label:'50mm Square',          hasQR:true  },
+  { id:'32mm_circle',   label:'32mm Circle',          hasQR:false },
+  { id:'56mm_magnet',   label:'56mm Magnet',          hasQR:true  },
+  { id:'32mm_magnet',   label:'32mm Magnet',          hasQR:false },
+  { id:'keychain_oval', label:'Keychain (40mm oval)', hasQR:true  },
+  { id:'keychain_rect', label:'Keychain (35x45mm)',   hasQR:true  },
 ];
 
 const ADDONS = [
@@ -83,7 +83,17 @@ const HOLO_STYLES = [
   { id:'HOLO-PRISMATIC',      name:'Prismatic',        emoji:'🔮' },
 ];
 
-type Step = 'bundle'|'creator'|'media'|'design'|'vault_design'|'drop_qr'|'sticker'|'button'|'fulfillment'|'details'|'review'|'cart';
+const ADDON_PRICES: Record<string,number> = {
+  qr_video:10, card_jacket:5, metallic_marker:4,
+  oil_marker:4, extra_print:10, extra_sticker:12, holo_upgrade:2,
+};
+
+const BUNDLE_EMOJI: Record<string,string> = {
+  essential:'🖼️', classic:'🎨', bundle:'🎁',
+  signature:'✨', drop:'📋', vault:'🎞️',
+};
+
+type Step = 'bundle'|'creator'|'media'|'design'|'vault_design'|'drop_qr'|'sticker'|'button'|'fulfillment'|'review'|'details';
 
 export default function GradEventPage() {
   const { state: cartState, addItem, removeItem, clearCart, cartTotal, cartCount } = useCart();
@@ -112,31 +122,37 @@ export default function GradEventPage() {
   const [form,            setForm]            = useState({
     name:'', email:'', phone:'',
     address:'', city:'', state:'', zip:'',
-    grad_name:'', school:'',
   });
 
   const selectedBundle = BUNDLES.find(b => b.id === bundle);
-  const addonTotal     = addons.reduce((sum,id) => sum + (ADDONS.find(x=>x.id===id)?.price||0), 0);
+  const addonTotal     = addons.reduce((sum,id) => sum + (ADDON_PRICES[id]||0), 0);
   const itemTotal      = (selectedBundle?.price||0) + addonTotal + (dropQR?5:0);
 
-  const STEPS: Step[] = [
-    'bundle','creator',
-    ...(selectedBundle?.hasQR || selectedBundle?.id==='vault' ? ['media' as Step] : []),
-    ...(selectedBundle?.id==='drop'  ? ['design' as Step, 'drop_qr' as Step] : []),
-    ...(selectedBundle?.id==='vault' ? ['vault_design' as Step] : []),
-    ...(selectedBundle?.id!=='drop' && selectedBundle?.id!=='vault' ? ['design' as Step] : []),
-    ...(selectedBundle?.hasSticker ? ['sticker' as Step] : []),
-    ...(selectedBundle?.hasButton  ? ['button'  as Step] : []),
-    'fulfillment','details','review',
-  ];
+  // Steps for current bundle
+  const getSteps = (b: typeof selectedBundle): Step[] => {
+    if (!b) return ['bundle'];
+    return [
+      'bundle',
+      'creator',
+      ...(b.hasQR || b.id==='vault' ? ['media' as Step] : []),
+      ...(b.id==='drop'  ? ['design' as Step, 'drop_qr' as Step] : []),
+      ...(b.id==='vault' ? ['vault_design' as Step] : []),
+      ...(b.id!=='drop' && b.id!=='vault' ? ['design' as Step] : []),
+      ...(b.hasSticker ? ['sticker' as Step] : []),
+      ...(b.hasButton  ? ['button'  as Step] : []),
+      'fulfillment',
+      'review',
+    ];
+  };
 
-  const stepLabels = STEPS.map(s => ({
+  const STEPS = getSteps(selectedBundle);
+  const stepIndex = STEPS.indexOf(step);
+
+  const STEP_LABELS: Record<Step,string> = {
     bundle:'Bundle', creator:'Supporting', media:'Memory', design:'Design',
     vault_design:'10 Prints', drop_qr:'QR', sticker:'Sticker', button:'Button',
-    fulfillment:'Delivery', details:'Details', review:'Review', cart:'Cart',
-  }[s]));
-
-  const stepIndex = STEPS.indexOf(step);
+    fulfillment:'Delivery', review:'Review', details:'Details',
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -147,11 +163,6 @@ export default function GradEventPage() {
       .then(d=>setBoothActive(d.booth_active||false))
       .catch(()=>{});
   }, []);
-
-  // If cart has items and we're at bundle step, show cart button
-  useEffect(() => {
-    if (cartCount > 0 && step === 'bundle') setShowCart(false);
-  }, [step, cartCount]);
 
   function toggleAddon(id:string) {
     setAddons(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
@@ -171,7 +182,6 @@ export default function GradEventPage() {
     if (idx > 0) setStep(STEPS[idx-1]);
   }
 
-  // Add current item to cart and reset for next item
   function addToCart() {
     const b = selectedBundle;
     if (!b) return;
@@ -181,9 +191,9 @@ export default function GradEventPage() {
       bundleId:      b.id,
       bundleName:    b.name,
       bundlePrice:   b.price,
-      creatorHandle: selectedCreator?.handle || null,
+      creatorHandle: selectedCreator?.handle      || null,
       creatorName:   selectedCreator?.display_name || null,
-      schoolName:    selectedCreator?.school_name || null,
+      schoolName:    selectedCreator?.school_name  || null,
       addons,
       addonTotal,
       editorState,
@@ -202,11 +212,10 @@ export default function GradEventPage() {
       isMulti:       b.isMulti,
     };
 
-    console.log('[cart] adding item:', item.bundleId, item.bundlePrice, 'addons:', item.addons);
-    
+    console.log('[cart] addToCart:', item.bundleId, item.bundlePrice);
     addItem(item);
 
-    // Reset item state
+    // Reset for next item
     setBundle(null);
     setAddons([]);
     setMediaFile(null);
@@ -222,8 +231,6 @@ export default function GradEventPage() {
     setHoloStyle(null);
     setHoloStyleName('');
     setSelectedCreator(null);
-
-    // Go to cart view
     setStep('bundle');
     setShowCart(true);
   }
@@ -231,29 +238,12 @@ export default function GradEventPage() {
   async function handleCheckout() {
     setLoading(true);
     try {
-      console.log('[cart] checkout — items:', cartState.items.length, 'total:', cartTotal);
-      console.log('[cart] items detail:', JSON.stringify(cartState.items.map(i=>({id:i.bundleId,price:i.bundlePrice,addons:i.addons}))));
-      // Upload media files (stored as blob URLs — re-fetch them)
-      const itemsWithUrls = await Promise.all(
-        cartState.items.map(async (item) => {
-          let mediaUrl = item.mediaUrl || null;
-          if (item.mediaFile) {
-            const fd = new FormData();
-            fd.append('file', item.mediaFile as any);
-            fd.append('folder', 'memory-clips');
-            const res  = await fetch('/api/upload', { method:'POST', body:fd });
-            const data = await res.json();
-            mediaUrl   = data.url;
-          }
-          return { ...item, mediaUrl };
-        })
-      );
-
+      console.log('[checkout] items:', cartState.items.length, 'total:', cartTotal);
       const res = await fetch('/api/checkout/cart', {
         method:  'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
-          items:      itemsWithUrls,
+          items:      cartState.items,
           form,
           event_slug: 'grad-2026',
         }),
@@ -261,8 +251,7 @@ export default function GradEventPage() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
-        // Clear cart after redirect initiated
-        setTimeout(() => clearCart(), 1000);
+        setTimeout(() => clearCart(), 2000);
       }
     } catch(err) { console.error(err); }
     setLoading(false);
@@ -274,10 +263,91 @@ export default function GradEventPage() {
     borderRadius:8, color:'#fff', fontSize:14, outline:'none',
   };
 
-  const BUNDLE_EMOJI: Record<string,string> = {
-    essential:'🖼️', classic:'🎨', bundle:'🎁',
-    signature:'✨', drop:'📋', vault:'🎞️',
-  };
+  // Cart panel component
+  const CartPanel = () => (
+    <div style={{background:'#111', border:'1px solid #222',
+                 borderRadius:12, padding:'16px', marginBottom:24}}>
+      <div style={{display:'flex', justifyContent:'space-between',
+                   alignItems:'center', marginBottom:12}}>
+        <p style={{fontWeight:600, fontSize:15, margin:0}}>
+          Your cart ({cartCount} item{cartCount!==1?'s':''})
+        </p>
+        <button onClick={()=>setShowCart(false)} style={{
+          background:'transparent', border:'none',
+          color:'#666', fontSize:18, cursor:'pointer',
+        }}>✕</button>
+      </div>
+
+      {cartState.items.length===0 ? (
+        <p style={{color:'#555', fontSize:13, textAlign:'center',
+                   padding:'16px 0', margin:0}}>
+          Your cart is empty — pick a bundle below.
+        </p>
+      ) : (
+        <>
+          {cartState.items.map(item => (
+            <div key={item.cartId} style={{
+              background:'#1a1a1a', borderRadius:10,
+              padding:'12px', marginBottom:8, border:'1px solid #222',
+            }}>
+              <div style={{display:'flex', justifyContent:'space-between',
+                           alignItems:'flex-start', gap:10}}>
+                <div style={{flex:1}}>
+                  <p style={{fontWeight:600, fontSize:13, margin:'0 0 3px'}}>
+                    {BUNDLE_EMOJI[item.bundleId]} {item.bundleName}
+                  </p>
+                  {item.creatorName && (
+                    <p style={{fontSize:11, color:'#4ADE80', margin:'0 0 2px'}}>
+                      Supporting {item.creatorName}
+                    </p>
+                  )}
+                  <p style={{fontSize:11, color:'#666', margin:'0 0 2px'}}>
+                    {item.fulfillment==='pickup'?'🎪 Booth pickup':'📦 Ship to door'}
+                  </p>
+                  {item.addons.length>0 && (
+                    <p style={{fontSize:10, color:'#555', margin:0}}>
+                      + {item.addons.map(id=>ADDONS.find(a=>a.id===id)?.name).filter(Boolean).join(', ')}
+                    </p>
+                  )}
+                </div>
+                <div style={{textAlign:'right', flexShrink:0}}>
+                  <p style={{fontSize:14, fontWeight:700, color:'#4ADE80', margin:'0 0 6px'}}>
+                    ${item.bundlePrice + (item.addons.reduce((s,id)=>s+(ADDON_PRICES[id]||0),0)) + (item.dropQR?5:0)}
+                  </p>
+                  <button onClick={()=>removeItem(item.cartId)} style={{
+                    padding:'3px 8px', background:'transparent',
+                    border:'1px solid #A32D2D', borderRadius:6,
+                    color:'#ff6b6b', fontSize:10, cursor:'pointer',
+                  }}>Remove</button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div style={{borderTop:'1px solid #222', paddingTop:12, marginTop:4}}>
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:12}}>
+              <span style={{fontSize:14, fontWeight:600}}>Cart total</span>
+              <span style={{fontSize:16, fontWeight:700, color:'#4ADE80'}}>${cartTotal}</span>
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:8}}>
+              <button onClick={()=>setShowCart(false)} style={{
+                width:'100%', padding:'10px',
+                background:'transparent', border:'1px solid #333',
+                borderRadius:8, color:'#888', fontSize:13, cursor:'pointer',
+              }}>+ Add another bundle</button>
+              <button onClick={()=>{ setShowCart(false); setStep('details'); }} style={{
+                width:'100%', padding:'12px',
+                background:'#4ADE80', color:'#000', border:'none',
+                borderRadius:8, fontSize:14, fontWeight:700, cursor:'pointer',
+              }}>
+                Checkout — ${cartTotal} →
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <main style={{
@@ -292,9 +362,7 @@ export default function GradEventPage() {
                      alignItems:'flex-start', marginBottom:24}}>
           <div>
             <p style={{fontSize:11, color:'#555', letterSpacing:4,
-                       textTransform:'uppercase', margin:'0 0 4px'}}>
-              Un Momento
-            </p>
+                       textTransform:'uppercase', margin:'0 0 4px'}}>Un Momento</p>
             <h1 style={{fontSize:22, fontWeight:500, margin:'0 0 2px'}}>
               Graduation Season 2026
             </h1>
@@ -302,8 +370,6 @@ export default function GradEventPage() {
               Order online · ships anywhere in the US
             </p>
           </div>
-
-          {/* Cart button */}
           <button onClick={()=>setShowCart(!showCart)} style={{
             position:'relative', padding:'8px 14px',
             background: cartCount>0 ? '#0d1f0d' : '#1a1a1a',
@@ -315,136 +381,33 @@ export default function GradEventPage() {
             🛒 Cart
             {cartCount>0 && (
               <span style={{
-                background:'#4ADE80', color:'#000',
-                borderRadius:'50%', width:18, height:18,
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:10, fontWeight:700,
+                background:'#4ADE80', color:'#000', borderRadius:'50%',
+                width:18, height:18, display:'flex', alignItems:'center',
+                justifyContent:'center', fontSize:10, fontWeight:700,
               }}>{cartCount}</span>
             )}
           </button>
         </div>
 
         {/* Cart panel */}
-        {showCart && (
-          <div style={{
-            background:'#111', border:'1px solid #222',
-            borderRadius:12, padding:'16px', marginBottom:24,
-          }}>
-            <div style={{display:'flex', justifyContent:'space-between',
-                         alignItems:'center', marginBottom:12}}>
-              <p style={{fontWeight:600, fontSize:15, margin:0}}>
-                Your cart ({cartCount} item{cartCount!==1?'s':''})
-              </p>
-              <button onClick={()=>setShowCart(false)} style={{
-                background:'transparent', border:'none',
-                color:'#666', fontSize:18, cursor:'pointer',
-              }}>✕</button>
-            </div>
+        {showCart && <CartPanel />}
 
-            {cartState.items.length===0 ? (
-              <p style={{color:'#555', fontSize:13, textAlign:'center',
-                         padding:'16px 0', margin:0}}>
-                Your cart is empty — add a bundle below.
-              </p>
-            ) : (
-              <>
-                {cartState.items.map((item, i) => (
-                  <div key={item.cartId} style={{
-                    background:'#1a1a1a', borderRadius:10,
-                    padding:'12px', marginBottom:8,
-                    border:'1px solid #222',
-                  }}>
-                    <div style={{display:'flex', justifyContent:'space-between',
-                                 alignItems:'flex-start', gap:10}}>
-                      <div style={{flex:1}}>
-                        <p style={{fontWeight:600, fontSize:13, margin:'0 0 3px'}}>
-                          {BUNDLE_EMOJI[item.bundleId]} {item.bundleName}
-                        </p>
-                        {item.creatorName && (
-                          <p style={{fontSize:11, color:'#4ADE80', margin:'0 0 2px'}}>
-                            Supporting {item.creatorName}
-                          </p>
-                        )}
-                        <p style={{fontSize:11, color:'#666', margin:'0 0 2px'}}>
-                          {item.fulfillment==='pickup'?'🎪 Booth pickup':'📦 Ship to door'}
-                        </p>
-                        {item.addons.length>0 && (
-                          <p style={{fontSize:10, color:'#555', margin:0}}>
-                            + {item.addons.map(id=>ADDONS.find(a=>a.id===id)?.name).join(', ')}
-                          </p>
-                        )}
-                      </div>
-                      <div style={{textAlign:'right', flexShrink:0}}>
-                        <p style={{fontSize:14, fontWeight:700, color:'#4ADE80',
-                                   margin:'0 0 6px'}}>
-                          ${item.bundlePrice + item.addonTotal + (item.dropQR?5:0)}
-                        </p>
-                        <button onClick={()=>removeItem(item.cartId)} style={{
-                          padding:'3px 8px', background:'transparent',
-                          border:'1px solid #A32D2D', borderRadius:6,
-                          color:'#ff6b6b', fontSize:10, cursor:'pointer',
-                        }}>Remove</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div style={{borderTop:'1px solid #222', paddingTop:12, marginTop:4}}>
-                  <div style={{display:'flex', justifyContent:'space-between',
-                               marginBottom:12}}>
-                    <span style={{fontSize:14, fontWeight:600}}>Cart total</span>
-                    <span style={{fontSize:16, fontWeight:700, color:'#4ADE80'}}>
-                      ${cartTotal}
-                    </span>
-                  </div>
-
-                  {step==='bundle' ? (
-                    <div style={{display:'flex', flexDirection:'column', gap:8}}>
-                      <button onClick={()=>setShowCart(false)} style={{
-                        width:'100%', padding:'10px',
-                        background:'transparent', border:'1px solid #333',
-                        borderRadius:8, color:'#888', fontSize:13, cursor:'pointer',
-                      }}>+ Add another bundle</button>
-                      <button onClick={()=>{
-                        setShowCart(false);
-                        setStep('details');
-                        // Force localStorage sync
-                        setTimeout(()=>{
-                          console.log('[cart] items at checkout:', cartState.items.length, JSON.stringify(cartState.items).slice(0,200));
-                        }, 100);
-                      }} style={{
-                        width:'100%', padding:'12px',
-                        background:'#4ADE80', color:'#000', border:'none',
-                        borderRadius:8, fontSize:14, fontWeight:700, cursor:'pointer',
-                      }}>
-                        Checkout — ${cartTotal} →
-                      </button>
-                    </div>
-                  ) : (
-                    <p style={{fontSize:12, color:'#888', textAlign:'center', margin:0}}>
-                      Finish customizing your current bundle to add it to cart.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Progress bar — only show when customizing */}
-        {step !== 'bundle' && step !== 'cart' && step !== 'details' && step !== 'review' && (
+        {/* Progress — show during customization steps */}
+        {step !== 'bundle' && step !== 'details' && (
           <div style={{display:'flex', gap:4, marginBottom:24}}>
-            {stepLabels.map((s,i) => (
-              <div key={i} style={{flex:1, textAlign:'center'}}>
+            {STEPS.map((s,i) => (
+              <div key={s} style={{flex:1, textAlign:'center'}}>
                 <div style={{height:4, borderRadius:2, marginBottom:4,
                   background: i<stepIndex?'#4ADE80':i===stepIndex?'#fff':'#333'}}/>
-                <span style={{fontSize:9, color:i===stepIndex?'#fff':'#444'}}>{s}</span>
+                <span style={{fontSize:9, color:i===stepIndex?'#fff':'#444'}}>
+                  {STEP_LABELS[s]}
+                </span>
               </div>
             ))}
           </div>
         )}
 
-        {/* STEP: BUNDLE */}
+        {/* ── BUNDLE ── */}
         {step==='bundle' && !showCart && (
           <div>
             {cartCount>0 && (
@@ -506,9 +469,7 @@ export default function GradEventPage() {
 
             {bundle && (
               <div style={{marginTop:16}}>
-                <p style={{fontSize:13, color:'#888', marginBottom:10}}>
-                  Add-ons (optional)
-                </p>
+                <p style={{fontSize:13, color:'#888', marginBottom:10}}>Add-ons (optional)</p>
                 <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
                   {ADDONS.map(a=>(
                     <button key={a.id} onClick={()=>toggleAddon(a.id)} style={{
@@ -532,21 +493,16 @@ export default function GradEventPage() {
             )}
 
             {cartCount>0 && !bundle && (
-              <button onClick={()=>{
-                setShowCart(false);
-                setStep('details');
-              }} style={{
+              <button onClick={()=>{ setShowCart(false); setStep('details'); }} style={{
                 width:'100%', marginTop:16, padding:14,
                 background:'#fff', color:'#000', border:'none',
                 borderRadius:10, fontSize:15, fontWeight:700, cursor:'pointer',
-              }}>
-                Checkout — ${cartTotal} →
-              </button>
+              }}>Checkout — ${cartTotal} →</button>
             )}
           </div>
         )}
 
-        {/* STEP: CREATOR */}
+        {/* ── CREATOR ── */}
         {step==='creator' && (
           <div>
             <CreatorSearch
@@ -563,7 +519,7 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP: MEDIA */}
+        {/* ── MEDIA ── */}
         {step==='media' && (
           <div>
             <MemoryRecorder
@@ -579,22 +535,22 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP: DESIGN */}
+        {/* ── DESIGN ── */}
         {step==='design' && (
           <div>
             <p style={{fontSize:13, color:'#888', margin:'0 0 16px', lineHeight:1.6}}>
               Design your 4×6 photo print. Any photo, any memory.
             </p>
             <CollageEditor
-              defaultGradName={form.grad_name}
-              defaultSchool={form.school}
+              defaultGradName={selectedCreator?.display_name || ''}
+              defaultSchool={selectedCreator?.school_name || ''}
               onComplete={(dataUrl,slots)=>{ setEditorState({dataUrl,slots}); nextStep('design'); }}
               onBack={()=>prevStep('design')}
             />
           </div>
         )}
 
-        {/* STEP: STICKER */}
+        {/* ── STICKER ── */}
         {step==='sticker' && (
           <div>
             <p style={{fontSize:13, color:'#888', margin:'0 0 16px', lineHeight:1.6}}>
@@ -607,7 +563,7 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP: BUTTON */}
+        {/* ── BUTTON ── */}
         {step==='button' && (
           <div>
             {showButtonStudio && buttonSize ? (
@@ -628,7 +584,7 @@ export default function GradEventPage() {
                   <p style={{color:'#4ADE80', fontWeight:600, fontSize:15, margin:'0 0 8px'}}>
                     Button design ready
                   </p>
-                  <img src={buttonDesign.dataUrl} alt="button preview"
+                  <img src={buttonDesign.dataUrl} alt="button"
                     style={{width:100, height:100, borderRadius:'50%',
                             objectFit:'cover', border:'2px solid #4ADE80',
                             display:'inline-block'}}/>
@@ -653,14 +609,11 @@ export default function GradEventPage() {
                             display:'flex',alignItems:'center',gap:8,
                           }}>
                           <span style={{fontSize:20}}>{s.emoji}</span>
-                          <span style={{fontSize:12,
-                                        color:holoStyle===s.id?'#4ADE80':'#888',
+                          <span style={{fontSize:12,color:holoStyle===s.id?'#4ADE80':'#888',
                                         fontWeight:holoStyle===s.id?600:400}}>
                             {s.name}
                           </span>
-                          {holoStyle===s.id&&(
-                            <span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>
-                          )}
+                          {holoStyle===s.id&&<span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>}
                         </div>
                       ))}
                       <div onClick={()=>{setHoloStyle('default');setHoloStyleName('Surprise me');}}
@@ -668,17 +621,13 @@ export default function GradEventPage() {
                           padding:'10px 12px',borderRadius:8,cursor:'pointer',
                           border:holoStyle==='default'?'2px solid #4ADE80':'1px dashed #333',
                           background:holoStyle==='default'?'#0d1f0d':'transparent',
-                          display:'flex',alignItems:'center',gap:8,
-                          gridColumn:'1/-1',
+                          display:'flex',alignItems:'center',gap:8,gridColumn:'1/-1',
                         }}>
                         <span style={{fontSize:20}}>🎲</span>
-                        <span style={{fontSize:12,
-                                      color:holoStyle==='default'?'#4ADE80':'#666'}}>
+                        <span style={{fontSize:12,color:holoStyle==='default'?'#4ADE80':'#666'}}>
                           Surprise me — highest stock style
                         </span>
-                        {holoStyle==='default'&&(
-                          <span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>
-                        )}
+                        {holoStyle==='default'&&<span style={{marginLeft:'auto',color:'#4ADE80'}}>✓</span>}
                       </div>
                     </div>
                   </div>
@@ -714,19 +663,14 @@ export default function GradEventPage() {
                     borderRadius:12, padding:'14px 16px', marginBottom:8,
                     cursor:'pointer', background:buttonSize===s.id?'#0d1f0d':'#111',
                   }}>
-                    <div style={{display:'flex', justifyContent:'space-between',
-                                 alignItems:'center'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                       <div>
-                        <p style={{fontWeight:600, fontSize:14, margin:'0 0 3px'}}>
-                          {s.label}
-                        </p>
+                        <p style={{fontWeight:600, fontSize:14, margin:'0 0 3px'}}>{s.label}</p>
                         <p style={{fontSize:12, color:'#888', margin:0}}>
-                          {s.hasQR?'QR memory code on back face':'Too small for QR code'}
+                          {s.hasQR?'QR memory code on back':'Too small for QR code'}
                         </p>
                       </div>
-                      {buttonSize===s.id&&(
-                        <span style={{color:'#4ADE80', fontSize:18}}>✓</span>
-                      )}
+                      {buttonSize===s.id&&<span style={{color:'#4ADE80', fontSize:18}}>✓</span>}
                     </div>
                   </div>
                 ))}
@@ -734,11 +678,8 @@ export default function GradEventPage() {
                   <button onClick={()=>prevStep('button')}
                     style={{flex:1, padding:12, border:'1px solid #333',
                             borderRadius:10, background:'transparent',
-                            color:'#fff', fontSize:14, cursor:'pointer'}}>
-                    Back
-                  </button>
-                  <button
-                    onClick={()=>{ if(buttonSize) setShowButtonStudio(true); }}
+                            color:'#fff', fontSize:14, cursor:'pointer'}}>Back</button>
+                  <button onClick={()=>{ if(buttonSize) setShowButtonStudio(true); }}
                     disabled={!buttonSize}
                     style={{flex:2, padding:12,
                             background:buttonSize?'#4ADE80':'#333',
@@ -753,7 +694,7 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP: DROP QR */}
+        {/* ── DROP QR ── */}
         {step==='drop_qr' && (
           <div>
             <div style={{textAlign:'center',marginBottom:24}}>
@@ -763,22 +704,20 @@ export default function GradEventPage() {
                 Add a QR memory clip?
               </h2>
               <p style={{fontSize:13,color:'#888',lineHeight:1.6,margin:0}}>
-                Add a scannable QR code to all 10 prints. Scannable forever.
+                Scannable QR code on all 10 prints. Links to your video or voice message. Forever.
               </p>
             </div>
             <div onClick={()=>setDropQR(true)} style={{
               border: dropQR?'2px solid #4ADE80':'1px solid #222',
               borderRadius:12, padding:'16px', marginBottom:8,
-              cursor:'pointer', background: dropQR?'#0d1f0d':'#111',
+              cursor:'pointer', background:dropQR?'#0d1f0d':'#111',
             }}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
                   <p style={{fontWeight:600,fontSize:14,margin:'0 0 4px'}}>
                     ✓ Yes — add QR memory clip
                   </p>
-                  <p style={{fontSize:12,color:'#888',margin:0}}>
-                    Record a video or voice message · +$5
-                  </p>
+                  <p style={{fontSize:12,color:'#888',margin:0}}>+$5</p>
                 </div>
                 <p style={{fontSize:18,fontWeight:700,color:'#4ADE80',margin:0}}>+$5</p>
               </div>
@@ -786,33 +725,27 @@ export default function GradEventPage() {
             <div onClick={()=>setDropQR(false)} style={{
               border: !dropQR?'2px solid #4ADE80':'1px solid #222',
               borderRadius:12, padding:'16px', marginBottom:24,
-              cursor:'pointer', background: !dropQR?'#0d1f0d':'#111',
+              cursor:'pointer', background:!dropQR?'#0d1f0d':'#111',
             }}>
-              <p style={{fontWeight:600,fontSize:14,margin:'0 0 4px'}}>
-                No thanks — prints only
-              </p>
-              <p style={{fontSize:12,color:'#888',margin:0}}>
-                Just the 10 prints, no QR code
-              </p>
+              <p style={{fontWeight:600,fontSize:14,margin:'0 0 4px'}}>No thanks — prints only</p>
+              <p style={{fontSize:12,color:'#888',margin:0}}>Just the 10 prints</p>
             </div>
             <div style={{display:'flex',gap:8}}>
               <button onClick={()=>prevStep('drop_qr')}
-                style={{flex:1,padding:12,border:'1px solid #333',
-                        borderRadius:10,background:'transparent',
-                        color:'#fff',fontSize:14,cursor:'pointer'}}>
+                style={{flex:1,padding:12,border:'1px solid #333',borderRadius:10,
+                        background:'transparent',color:'#fff',fontSize:14,cursor:'pointer'}}>
                 Back
               </button>
               <button onClick={()=>nextStep('drop_qr')}
-                style={{flex:2,padding:12,background:'#4ADE80',
-                        color:'#000',border:'none',borderRadius:10,
-                        fontSize:14,fontWeight:700,cursor:'pointer'}}>
+                style={{flex:2,padding:12,background:'#4ADE80',color:'#000',border:'none',
+                        borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>
                 Continue {dropQR?'— record message':'— prints only'} →
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP: VAULT DESIGN */}
+        {/* ── VAULT DESIGN ── */}
         {step==='vault_design' && (
           <div>
             <div style={{display:'flex',justifyContent:'space-between',
@@ -829,40 +762,35 @@ export default function GradEventPage() {
                 {Array.from({length:10},(_,i)=>(
                   <div key={i} onClick={()=>setVaultPrintIndex(i)} style={{
                     width:22,height:22,borderRadius:4,cursor:'pointer',
-                    background: vaultPrints[i]?'#4ADE80':i===vaultPrintIndex?'#1a3a1a':'#1a1a1a',
-                    border: i===vaultPrintIndex?'2px solid #4ADE80':'1px solid #333',
+                    background:vaultPrints[i]?'#4ADE80':i===vaultPrintIndex?'#1a3a1a':'#1a1a1a',
+                    border:i===vaultPrintIndex?'2px solid #4ADE80':'1px solid #333',
                     display:'flex',alignItems:'center',justifyContent:'center',
-                    fontSize:9,
-                    color:vaultPrints[i]?'#000':i===vaultPrintIndex?'#4ADE80':'#555',
-                  }}>
-                    {vaultPrints[i]?'✓':i+1}
-                  </div>
+                    fontSize:9,color:vaultPrints[i]?'#000':i===vaultPrintIndex?'#4ADE80':'#555',
+                  }}>{vaultPrints[i]?'✓':i+1}</div>
                 ))}
               </div>
             </div>
             <CollageEditor
               key={vaultPrintIndex}
-              defaultGradName={form.grad_name}
-              defaultSchool={form.school}
-              onComplete={(dataUrl, slots) => {
-                const updated = [...vaultPrints];
-                updated[vaultPrintIndex] = { dataUrl, slots };
+              defaultGradName={selectedCreator?.display_name||''}
+              defaultSchool={selectedCreator?.school_name||''}
+              onComplete={(dataUrl,slots)=>{
+                const updated=[...vaultPrints];
+                updated[vaultPrintIndex]={dataUrl,slots};
                 setVaultPrints(updated);
-                if (vaultPrintIndex < 9) setVaultPrintIndex(vaultPrintIndex+1);
+                if(vaultPrintIndex<9) setVaultPrintIndex(vaultPrintIndex+1);
               }}
-              onBack={() => {
-                if (vaultPrintIndex > 0) setVaultPrintIndex(vaultPrintIndex-1);
+              onBack={()=>{
+                if(vaultPrintIndex>0) setVaultPrintIndex(vaultPrintIndex-1);
                 else prevStep('vault_design');
               }}
             />
-            {vaultPrints.filter(Boolean).length===10 && (
+            {vaultPrints.filter(Boolean).length===10&&(
               <button onClick={()=>nextStep('vault_design')} style={{
                 width:'100%',marginTop:12,padding:14,
                 background:'#4ADE80',color:'#000',border:'none',
                 borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',
-              }}>
-                All 10 prints designed — continue →
-              </button>
+              }}>All 10 prints designed — continue →</button>
             )}
             <p style={{fontSize:11,color:'#555',textAlign:'center',marginTop:8}}>
               {vaultPrints.filter(Boolean).length}/10 prints designed
@@ -870,7 +798,7 @@ export default function GradEventPage() {
           </div>
         )}
 
-        {/* STEP: FULFILLMENT */}
+        {/* ── FULFILLMENT ── */}
         {step==='fulfillment' && (
           <div>
             <p style={{fontSize:14, fontWeight:500, margin:'0 0 16px'}}>
@@ -879,81 +807,64 @@ export default function GradEventPage() {
             <div onClick={()=>setFulfillment('ship')} style={{
               border: fulfillment==='ship'?'2px solid #4ADE80':'1px solid #222',
               borderRadius:12, padding:'1rem', marginBottom:10,
-              cursor:'pointer', background: fulfillment==='ship'?'#0d1f0d':'#111',
+              cursor:'pointer', background:fulfillment==='ship'?'#0d1f0d':'#111',
             }}>
-              <p style={{fontWeight:600, fontSize:15, margin:'0 0 4px'}}>
-                📦 Ship to my door
-              </p>
-              <p style={{fontSize:13, color:'#888', margin:0}}>
-                Ships anywhere in the US in 4–5 business days.
-              </p>
+              <p style={{fontWeight:600, fontSize:15, margin:'0 0 4px'}}>📦 Ship to my door</p>
+              <p style={{fontSize:13, color:'#888', margin:0}}>Ships in 4–5 business days.</p>
             </div>
             {boothActive && (
               <div onClick={()=>setFulfillment('pickup')} style={{
                 border: fulfillment==='pickup'?'2px solid #4ADE80':'1px solid #222',
                 borderRadius:12, padding:'1rem', marginBottom:10,
-                cursor:'pointer', background: fulfillment==='pickup'?'#0d1f0d':'#111',
+                cursor:'pointer', background:fulfillment==='pickup'?'#0d1f0d':'#111',
                 position:'relative',
               }}>
-                <span style={{position:'absolute', top:-10, left:12,
-                              background:'#4ADE80', color:'#000',
-                              fontSize:10, fontWeight:700,
-                              padding:'2px 8px', borderRadius:10}}>
-                  AVAILABLE TODAY
-                </span>
-                <p style={{fontWeight:600, fontSize:15, margin:'0 0 4px'}}>
-                  🎪 Pick up at the booth
-                </p>
-                <p style={{fontSize:13, color:'#888', margin:0}}>
-                  Print ready in under 2 minutes.
-                </p>
+                <span style={{position:'absolute', top:-10, left:12, background:'#4ADE80',
+                              color:'#000', fontSize:10, fontWeight:700,
+                              padding:'2px 8px', borderRadius:10}}>AVAILABLE TODAY</span>
+                <p style={{fontWeight:600, fontSize:15, margin:'0 0 4px'}}>🎪 Pick up at the booth</p>
+                <p style={{fontSize:13, color:'#888', margin:0}}>Print ready in under 2 minutes.</p>
               </div>
             )}
             <div style={{display:'flex', gap:8, marginTop:16}}>
               <button onClick={()=>prevStep('fulfillment')}
-                style={{flex:1, padding:12, border:'1px solid #333',
-                        borderRadius:10, background:'transparent',
-                        color:'#fff', fontSize:14, cursor:'pointer'}}>
+                style={{flex:1, padding:12, border:'1px solid #333', borderRadius:10,
+                        background:'transparent', color:'#fff', fontSize:14, cursor:'pointer'}}>
                 Back
               </button>
               <button onClick={()=>nextStep('fulfillment')}
-                style={{flex:2, padding:12, background:'#4ADE80',
-                        color:'#000', border:'none', borderRadius:10,
-                        fontSize:14, fontWeight:700, cursor:'pointer'}}>
+                style={{flex:2, padding:12, background:'#4ADE80', color:'#000',
+                        border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer'}}>
                 Continue
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP: REVIEW — Add to cart */}
+        {/* ── REVIEW → ADD TO CART ── */}
         {step==='review' && selectedBundle && (
           <div>
-            <p style={{fontSize:14, fontWeight:600, margin:'0 0 12px'}}>
-              Review this item
-            </p>
-            <div style={{background:'#111', borderRadius:12,
-                         padding:'1rem', marginBottom:16}}>
+            <p style={{fontSize:14, fontWeight:600, margin:'0 0 12px'}}>Review this item</p>
+            <div style={{background:'#111', borderRadius:12, padding:'1rem', marginBottom:16}}>
               {[
-                ['Bundle',       `${selectedBundle.name} — $${selectedBundle.price}`],
-                ...addons.map(id=>{ const a=ADDONS.find(x=>x.id===id); return [a?.name||'',`+$${a?.price}`]; }),
-                ...(dropQR ? [['QR clip', '+$5']] : []),
-                ['Supporting',   selectedCreator?`${selectedCreator.display_name}`:'General fund'],
-                ['Memory clip',  mediaFile?`${mediaType} recorded`:'Not recorded'],
+                ['Bundle',      `${selectedBundle.name} — $${selectedBundle.price}`],
+                ...addons.map(id=>{ const a=ADDONS.find(x=>x.id===id); return [a?.name||'', `+$${a?.price}`]; }),
+                ...(dropQR?[['QR clip','+$5']]:[] as any),
+                ['Supporting',  selectedCreator?selectedCreator.display_name:'General fund'],
+                ['Memory clip', mediaFile?`${mediaType} recorded`:'Not recorded'],
                 ['Photo design',
                   selectedBundle.id==='vault'
-                    ? `${vaultPrints.filter(Boolean).length}/10 prints`
-                    : selectedBundle.id==='drop'
-                    ? `1 design × 10 copies${dropQR?' + QR':''}`
-                    : editorState?'Designed':'Not designed'
+                    ?`${vaultPrints.filter(Boolean).length}/10 prints designed`
+                    :selectedBundle.id==='drop'
+                    ?`1 design × 10 copies${dropQR?' + QR':''}`
+                    :editorState?'Designed':'Not designed'
                 ],
-                ['Sticker',      stickerData?'Designed':selectedBundle.hasSticker?'Not designed':'—'],
-                ['Button',       buttonSize?BUTTON_SIZES.find(s=>s.id===buttonSize)?.label||'':'—'],
-                ['Delivery',     fulfillment==='pickup'?'Booth pickup':'Ship to door'],
+                ['Sticker',     stickerData?'Designed':selectedBundle.hasSticker?'Not designed':'—'],
+                ['Button',      buttonSize?BUTTON_SIZES.find(s=>s.id===buttonSize)?.label||'':'—'],
+                ['Delivery',    fulfillment==='pickup'?'Booth pickup':'Ship to door'],
               ].map(([k,v])=>(
-                <div key={k} style={{display:'flex', justifyContent:'space-between',
-                                     padding:'5px 0', borderBottom:'1px solid #222',
-                                     fontSize:13}}>
+                <div key={String(k)} style={{display:'flex', justifyContent:'space-between',
+                                     padding:'5px 0', borderBottom:'1px solid #222', fontSize:13}}>
                   <span style={{color:'#888'}}>{k}</span>
                   <span style={{color:'#fff', maxWidth:220, textAlign:'right'}}>{v}</span>
                 </div>
@@ -967,63 +878,45 @@ export default function GradEventPage() {
 
             <div style={{display:'flex', gap:8}}>
               <button onClick={()=>prevStep('review')}
-                style={{flex:1, padding:12, border:'1px solid #333',
-                        borderRadius:10, background:'transparent',
-                        color:'#fff', fontSize:14, cursor:'pointer'}}>
+                style={{flex:1, padding:12, border:'1px solid #333', borderRadius:10,
+                        background:'transparent', color:'#fff', fontSize:14, cursor:'pointer'}}>
                 Back
               </button>
               <button onClick={addToCart}
-                style={{flex:2, padding:12, background:'#4ADE80',
-                        color:'#000', border:'none', borderRadius:10,
-                        fontSize:14, fontWeight:700, cursor:'pointer'}}>
+                style={{flex:2, padding:12, background:'#4ADE80', color:'#000',
+                        border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer'}}>
                 Add to cart →
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP: DETAILS (shared across all cart items) */}
+        {/* ── DETAILS ── */}
         {step==='details' && (
           <div style={{display:'flex', flexDirection:'column', gap:12}}>
             <div style={{background:'#0d1f0d', border:'1px solid #1a3a1a',
-                         borderRadius:10, padding:'10px 14px', marginBottom:4}}>
+                         borderRadius:10, padding:'10px 14px'}}>
               <p style={{fontSize:13, color:'#4ADE80', margin:0, fontWeight:600}}>
-                {cartState.items.length} items in context · cartCount={cartCount} · total=${cartTotal}
+                {cartCount} item{cartCount!==1?'s':''} · ${cartTotal} total
               </p>
-              <p style={{fontSize:11, color:'#888', margin:'4px 0 0'}}>
-                localStorage: {typeof window!=='undefined'?localStorage.getItem('unmomento_cart')?.slice(0,100):'—'}
-              </p>
+              {cartState.items.some(i=>i.creatorName) && (
+                <p style={{fontSize:11, color:'#888', margin:'3px 0 0'}}>
+                  Supporting: {[...new Set(cartState.items.filter(i=>i.creatorName).map(i=>i.creatorName))].join(', ')}
+                </p>
+              )}
             </div>
 
-            <p style={{fontWeight:500, fontSize:14, margin:'0 0 4px'}}>
-              Your information
-            </p>
+            <p style={{fontWeight:500, fontSize:14, margin:'0 0 4px'}}>Your information</p>
             <input style={inp} placeholder="Full name *"
               value={form.name} onChange={e=>setField('name',e.target.value)}/>
             <input style={inp} placeholder="Email address *" type="email"
               value={form.email} onChange={e=>setField('email',e.target.value)}/>
             <input style={inp} placeholder="Phone number"
               value={form.phone} onChange={e=>setField('phone',e.target.value)}/>
-            {/* Show creator info from cart items */}
-            {cartState.items.some(i=>i.creatorName) && (
-              <div style={{background:'#0d1f0d',border:'1px solid #1a3a1a',
-                           borderRadius:8,padding:'10px 14px'}}>
-                <p style={{fontSize:12,color:'#4ADE80',margin:0}}>
-                  Supporting:{' '}
-                  {cartState.items
-                    .filter(i=>i.creatorName)
-                    .map(i=>i.creatorName)
-                    .filter((v,i,a)=>a.indexOf(v)===i)
-                    .join(', ')}
-                </p>
-              </div>
-            )}
 
             {cartState.items.some(i=>i.fulfillment==='ship') && (
               <>
-                <p style={{fontWeight:500, fontSize:14, margin:'4px 0'}}>
-                  Shipping address
-                </p>
+                <p style={{fontWeight:500, fontSize:14, margin:'4px 0'}}>Shipping address</p>
                 <input style={inp} placeholder="Street address *"
                   value={form.address} onChange={e=>setField('address',e.target.value)}/>
                 <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:8}}>
@@ -1039,17 +932,18 @@ export default function GradEventPage() {
 
             <div style={{display:'flex', gap:8}}>
               <button onClick={()=>{ setStep('bundle'); setShowCart(true); }}
-                style={{flex:1, padding:12, border:'1px solid #333',
-                        borderRadius:10, background:'transparent',
-                        color:'#fff', fontSize:14, cursor:'pointer'}}>
+                style={{flex:1, padding:12, border:'1px solid #333', borderRadius:10,
+                        background:'transparent', color:'#fff', fontSize:14, cursor:'pointer'}}>
                 ← Cart
               </button>
-              <button onClick={()=>{
-                const hasShip = cartState.items.some(i=>i.fulfillment==='ship');
-                const valid   = form.name && form.email &&
-                  (!hasShip || (form.address && form.city && form.state && form.zip));
-                if(valid) handleCheckout();
-              }} disabled={loading}
+              <button
+                onClick={()=>{
+                  const hasShip = cartState.items.some(i=>i.fulfillment==='ship');
+                  const valid   = form.name && form.email &&
+                    (!hasShip || (form.address && form.city && form.state && form.zip));
+                  if(valid) handleCheckout();
+                }}
+                disabled={loading}
                 style={{flex:2, padding:12,
                         background:loading?'#333':'#4ADE80',
                         color:loading?'#888':'#000', border:'none',

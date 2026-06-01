@@ -255,7 +255,7 @@ export default function CreatorStorefront({
         </div>
 
         {/* Stats */}
-        {(creator.total_donated > 0 || campaignStats?.order_count > 0) && (
+        {(creator.total_donated > 0 || (campaignStats?.order_count || 0) > 0) && (
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
             gap: 8, marginBottom: 16,

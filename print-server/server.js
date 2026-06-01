@@ -20,6 +20,9 @@ const CONFIG = {
   
   // Picker API base URL
   apiBase: process.env.API_BASE || 'https://www.unmomentoprints.com',
+  // This booth's asset tags — set in .env per booth
+  assetTags: (process.env.ASSET_TAGS || 'UMP-PHT-2026-001,UMP-PHT-2026-002,UMP-STK-2026-001,UMP-STK-2026-002').split(','),
+  boothId:   process.env.BOOTH_ID || 'grad-2026',
   pickerPin: process.env.PICKER_PIN || '2026',
 
   // Poll interval (ms)
@@ -184,7 +187,8 @@ function downloadFile(url, destPath) {
 
 // ── SUPABASE API ──────────────────────────────────────────────────────────────
 async function fetchPrintQueue() {
-  const url = `${CONFIG.supabaseUrl}/rest/v1/print_queue?status=eq.queued&select=*,orders(buyer_name,buyer_phone,order_number,product_type)&order=priority.asc,queued_at.asc&limit=10`;
+  const tags = CONFIG.assetTags.join(',');
+  const url  = `${CONFIG.supabaseUrl}/rest/v1/print_queue?status=eq.queued&asset_tag=in.(${tags})&select=id,order_id,print_type,file_url,status,priority,asset_tag,customer_name,customer_phone,copies,orders(buyer_name,buyer_phone,order_number,product_type)&order=priority.asc,queued_at.asc&limit=10`;
   
   return new Promise((resolve, reject) => {
     const req = http.get(url, {
@@ -197,8 +201,15 @@ async function fetchPrintQueue() {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
+        try {
+        const parsed = JSON.parse(data);
+        if (!Array.isArray(parsed)) {
+          console.error('[poll] unexpected response:', JSON.stringify(parsed).slice(0,200));
+          resolve([]);
+        } else {
+          resolve(parsed);
+        }
+      } catch (e) { reject(e); }
       });
     });
     req.on('error', reject);

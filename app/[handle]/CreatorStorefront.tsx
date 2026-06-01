@@ -71,7 +71,7 @@ const BUNDLES = [
   },
   {
     id: 'signature', name: 'Momento Signature', price: 58,
-    desc: 'The complete graduation keepsake experience',
+    desc: '4×6 print · sticker sheet · button/magnet · card jacket · metallic marker · QR video clip',
     emoji: '✨', popular: false,
   },
 ];

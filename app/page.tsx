@@ -151,7 +151,7 @@ export default function Home() {
           Print any memory that deserves to live in the real world —
           graduation, birthdays, snapshots, year-in-review collages,
           or your favorite filtered photo. Die-cut stickers, custom buttons,
-          nd QR memory clips included. Ships anywhere in the US in 4–5 days.
+          and QR memory clips included. Ships anywhere in the US in 4–5 days.
         </p>
 
         {totalRaised > 0 && (
@@ -520,7 +520,7 @@ export default function Home() {
           </p>
           <h2 style={{ fontSize: 'clamp(22px, 4vw, 32px)', fontWeight: 500,
                        textAlign: 'center', margin: '0 0 40px', letterSpacing: '-0.01em' }}>
-            Four bundles. Every memory worth keeping.
+            Six bundles. Every memory worth keeping.
           </h2>
           <div style={{ display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 10 }}>

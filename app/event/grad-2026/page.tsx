@@ -980,7 +980,10 @@ export default function GradEventPage() {
             <div style={{background:'#0d1f0d', border:'1px solid #1a3a1a',
                          borderRadius:10, padding:'10px 14px', marginBottom:4}}>
               <p style={{fontSize:13, color:'#4ADE80', margin:0, fontWeight:600}}>
-                {cartCount} item{cartCount!==1?'s':''} · ${cartTotal} total
+                {cartState.items.length} items in context · cartCount={cartCount} · total=${cartTotal}
+              </p>
+              <p style={{fontSize:11, color:'#888', margin:'4px 0 0'}}>
+                localStorage: {typeof window!=='undefined'?localStorage.getItem('unmomento_cart')?.slice(0,100):'—'}
               </p>
             </div>
 

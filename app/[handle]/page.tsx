@@ -17,12 +17,23 @@ export default async function CreatorPage({
   // Fetch creator profile
   const { data: creator } = await supabase
     .from('creator_profiles')
-    .select('*, schools(name, city, state_abbr, type)')
+    .select('*')
     .eq('handle', handle)
     .eq('is_active', true)
     .single();
 
   if (!creator) notFound();
+
+  // Fetch school separately
+  let school = null;
+  if (creator.school_id) {
+    const { data: schoolData } = await supabase
+      .from('schools')
+      .select('name, city, state_abbr, type')
+      .eq('id', creator.school_id)
+      .single();
+    school = schoolData;
+  }
 
   // Fetch campaign stats
   const { data: campaignStats } = await supabase
@@ -51,7 +62,7 @@ export default async function CreatorPage({
   return (
     <CreatorStorefront
       creator={creator}
-      school={(creator as any).schools}
+      school={school}
       campaignStats={campaignStats || null}
       schoolStats={schoolStats   || null}
       rank={rank}
@@ -66,18 +77,28 @@ export async function generateMetadata({
 }) {
   const { data: creator } = await supabase
     .from('creator_profiles')
-    .select('display_name, schools(name)')
+    .select('display_name, school_id')
     .eq('handle', params.handle)
     .single();
 
   if (!creator) return { title: 'Creator | Un Momento' };
 
+  let schoolName = 'their school';
+  if (creator.school_id) {
+    const { data: school } = await supabase
+      .from('schools')
+      .select('name')
+      .eq('id', creator.school_id)
+      .single();
+    schoolName = school?.name || 'their school';
+  }
+
   return {
     title: `${creator.display_name} · Un Momento`,
-    description: `Support ${creator.display_name} — 10% of your order goes to ${(creator as any).schools?.name || 'their school'}.`,
+    description: `Support ${creator.display_name} — 10% of your order goes to ${schoolName}.`,
     openGraph: {
       title: `Support ${creator.display_name} on Un Momento`,
-      description: `Order graduation prints and 10% goes to ${(creator as any).schools?.name || 'their school'}'s PTSO.`,
+      description: `Order graduation prints and 10% goes to ${schoolName}'s PTSO.`,
     },
   };
 }

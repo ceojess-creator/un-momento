@@ -74,6 +74,16 @@ const BUNDLES = [
     desc: '4×6 print · sticker sheet · button/magnet · card jacket · metallic marker · QR video clip',
     emoji: '✨', popular: false,
   },
+  {
+    id:'drop',   name:'Momento Drop',  price:25,
+    desc:'1 design printed 10 times — perfect for handing out',
+    emoji:'📋', popular:false,
+  },
+  {
+    id:'vault',  name:'Momento Vault', price:45,
+    desc:'10 unique prints — your memory highlight reel',
+    emoji:'🎞️', popular:false,
+  },
 ];
 
 export default function CreatorStorefront({

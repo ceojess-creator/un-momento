@@ -12,24 +12,42 @@ const BUNDLES = [
     desc:'Instant 4×6 photo print + QR memory code',
     includes:['4×6 photo print','QR code on print face','Ships in 4–5 days'],
     popular:false, hasSticker:false, hasButton:false,
+    hasQR:true, isMulti:false, printCount:1,
   },
   {
     id:'classic', name:'Momento Classic', price:28,
     desc:'Photo print + die-cut sticker sheet + QR memory code',
     includes:['4×6 photo print','Die-cut 4×7 sticker sheet','QR code on print face','Ships in 4–5 days'],
     popular:true, hasSticker:true, hasButton:false,
+    hasQR:true, isMulti:false, printCount:1,
   },
   {
     id:'bundle', name:'Momento Bundle', price:45,
     desc:'Photo + stickers + button or magnet + card jacket',
     includes:['4×6 photo print','Die-cut 4×7 sticker sheet','Custom button or magnet','Black card jacket','QR code on print face','Ships in 4–5 days'],
     popular:false, hasSticker:true, hasButton:true,
+    hasQR:true, isMulti:false, printCount:1,
   },
   {
     id:'signature', name:'Momento Signature', price:58,
     desc:'The complete graduation keepsake experience',
     includes:['4×6 photo print','Die-cut 4×7 sticker sheet','Custom button or magnet','Black card jacket','Metallic marker','QR video memory upgrade','Ships in 4–5 days'],
     popular:false, hasSticker:true, hasButton:true,
+    hasQR:true, isMulti:false, printCount:1,
+  },
+  {
+    id:'drop', name:'Momento Drop', price:25,
+    desc:'1 design printed 10 times — perfect for handing out',
+    includes:['10 copies of your design','4×6 photo print × 10','QR memory clip optional (+$5)','Ships in 4–5 days'],
+    popular:false, hasSticker:false, hasButton:false,
+    hasQR:false, isMulti:false, printCount:10,
+  },
+  {
+    id:'vault', name:'Momento Vault', price:45,
+    desc:'10 individual photos, each printed as a separate 4×6',
+    includes:['10 unique 4×6 photo prints','Design each print individually','1 QR memory clip on all 10 prints','Ships in 4–5 days'],
+    popular:false, hasSticker:false, hasButton:false,
+    hasQR:true, isMulti:true, printCount:10,
   },
 ];
 
@@ -64,7 +82,6 @@ const HOLO_STYLES = [
   { id:'HOLO-PRISMATIC',      name:'Prismatic',          emoji:'🔮' },
 ];
 
-type Step = 'bundle'|'creator'|'media'|'design'|'sticker'|'button'|'fulfillment'|'details'|'review';
 
 export default function GradEventPage() {
   const [step,            setStep]            = useState<Step>('bundle');
@@ -77,6 +94,9 @@ export default function GradEventPage() {
   const [buttonSize,      setButtonSize]      = useState<string|null>(null);
   const [buttonDesign,    setButtonDesign]    = useState<any>(null);
   const [showButtonStudio,setShowButtonStudio]= useState(false);
+  const [dropQR,          setDropQR]          = useState(false);
+  const [vaultPrints,     setVaultPrints]     = useState<any[]>(Array.from({length:10},()=>null));
+  const [vaultPrintIndex, setVaultPrintIndex] = useState(0);
   const [holoStyle,       setHoloStyle]       = useState<string|null>(null);
   const [holoStyleName,   setHoloStyleName]   = useState<string>('');
   const [fulfillment,     setFulfillment]     = useState<'ship'|'pickup'>('ship');
@@ -94,8 +114,14 @@ export default function GradEventPage() {
   const addonTotal     = addons.reduce((sum,id) => sum + (ADDONS.find(x=>x.id===id)?.price||0), 0);
   const total          = (selectedBundle?.price||0) + addonTotal;
 
+  type Step = 'bundle'|'creator'|'media'|'design'|'vault_design'|'drop_qr'|'sticker'|'button'|'fulfillment'|'details'|'review';
+
   const STEPS: Step[] = [
-    'bundle','creator','media','design',
+    'bundle','creator',
+    ...(selectedBundle?.hasQR || selectedBundle?.id==='vault' ? ['media' as Step] : []),
+    ...(selectedBundle?.id==='drop'  ? ['design' as Step, 'drop_qr' as Step] : []),
+    ...(selectedBundle?.id==='vault' ? ['vault_design' as Step] : []),
+    ...(selectedBundle?.id!=='drop' && selectedBundle?.id!=='vault' ? ['design' as Step] : []),
     ...(selectedBundle?.hasSticker ? ['sticker' as Step] : []),
     ...(selectedBundle?.hasButton  ? ['button'  as Step] : []),
     'fulfillment','details','review',
@@ -103,8 +129,8 @@ export default function GradEventPage() {
 
   const stepLabels = STEPS.map(s => ({
     bundle:'Bundle', creator:'Supporting', media:'Memory', design:'Design',
-    sticker:'Sticker', button:'Button', fulfillment:'Delivery',
-    details:'Details', review:'Review',
+    vault_design:'10 Prints', drop_qr:'QR', sticker:'Sticker', button:'Button',
+    fulfillment:'Delivery', details:'Details', review:'Review',
   }[s]));
 
   const stepIndex = STEPS.indexOf(step);
@@ -166,6 +192,10 @@ export default function GradEventPage() {
           editor_state:      editorState,
           sticker_data:      stickerData,
           sticker_data_url:  stickerData?.dataUrl || null,
+          print_count:       selectedBundle?.printCount || 1,
+          is_multi_print:    selectedBundle?.isMulti    || false,
+          vault_prints:      vaultPrints.filter(Boolean).map((p:any)=>p.dataUrl),
+          drop_qr:           dropQR,
           button_size:      buttonSize,
           button_design:    buttonDesign,
           button_design_url: buttonDesign?.dataUrl || null,
@@ -443,6 +473,126 @@ export default function GradEventPage() {
           </div>
         )}
 
+        {/* STEP: DROP QR */}
+        {step==='drop_qr' && (
+          <div>
+            <div style={{textAlign:'center',marginBottom:24}}>
+              <p style={{fontSize:11,color:'#4ADE80',letterSpacing:4,
+                         textTransform:'uppercase',margin:'0 0 8px'}}>Optional</p>
+              <h2 style={{fontSize:20,fontWeight:500,margin:'0 0 8px'}}>
+                Add a QR memory clip?
+              </h2>
+              <p style={{fontSize:13,color:'#888',lineHeight:1.6,margin:0}}>
+                Add a scannable QR code to all 10 prints linking to a video or voice message.
+                Scannable forever — even years from now.
+              </p>
+            </div>
+
+            <div onClick={()=>setDropQR(true)} style={{
+              border: dropQR?'2px solid #4ADE80':'1px solid #222',
+              borderRadius:12, padding:'16px', marginBottom:8, cursor:'pointer',
+              background: dropQR?'#0d1f0d':'#111', position:'relative',
+            }}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <p style={{fontWeight:600,fontSize:14,margin:'0 0 4px'}}>
+                    ✓ Yes — add QR memory clip
+                  </p>
+                  <p style={{fontSize:12,color:'#888',margin:0}}>
+                    Record a video or voice message · links on all 10 prints · +$5
+                  </p>
+                </div>
+                <p style={{fontSize:18,fontWeight:700,color:'#4ADE80',margin:0}}>+$5</p>
+              </div>
+            </div>
+
+            <div onClick={()=>setDropQR(false)} style={{
+              border: !dropQR?'2px solid #4ADE80':'1px solid #222',
+              borderRadius:12, padding:'16px', marginBottom:24, cursor:'pointer',
+              background: !dropQR?'#0d1f0d':'#111',
+            }}>
+              <p style={{fontWeight:600,fontSize:14,margin:'0 0 4px'}}>
+                No thanks — prints only
+              </p>
+              <p style={{fontSize:12,color:'#888',margin:0}}>
+                Just the 10 prints, no QR code
+              </p>
+            </div>
+
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>prevStep('drop_qr')} style={{flex:1,padding:12,border:'1px solid #333',borderRadius:10,background:'transparent',color:'#fff',fontSize:14,cursor:'pointer'}}>Back</button>
+              <button onClick={()=>{
+                if (dropQR) nextStep('drop_qr'); // go to media recording
+                else nextStep('drop_qr');
+              }} style={{flex:2,padding:12,background:'#4ADE80',color:'#000',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer'}}>
+                Continue {dropQR?'— record your message':'— prints only'} →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP: VAULT DESIGN (10 individual prints) */}
+        {step==='vault_design' && (
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div>
+                <h2 style={{fontSize:18,fontWeight:500,margin:'0 0 4px'}}>
+                  Design your 10 prints
+                </h2>
+                <p style={{fontSize:12,color:'#888',margin:0}}>
+                  Print {vaultPrintIndex+1} of 10
+                </p>
+              </div>
+              <div style={{display:'flex',gap:4}}>
+                {Array.from({length:10},(_,i)=>(
+                  <div key={i} onClick={()=>setVaultPrintIndex(i)} style={{
+                    width:22,height:22,borderRadius:4,cursor:'pointer',
+                    background: vaultPrints[i]?'#4ADE80':i===vaultPrintIndex?'#1a3a1a':'#1a1a1a',
+                    border: i===vaultPrintIndex?'2px solid #4ADE80':'1px solid #333',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:9,color:vaultPrints[i]?'#000':i===vaultPrintIndex?'#4ADE80':'#555',
+                  }}>
+                    {vaultPrints[i]?'✓':i+1}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <CollageEditor
+              key={vaultPrintIndex}
+              defaultGradName={form.grad_name}
+              defaultSchool={form.school}
+              onComplete={(dataUrl, slots) => {
+                const updated = [...vaultPrints];
+                updated[vaultPrintIndex] = { dataUrl, slots };
+                setVaultPrints(updated);
+                if (vaultPrintIndex < 9) {
+                  setVaultPrintIndex(vaultPrintIndex+1);
+                }
+              }}
+              onBack={() => {
+                if (vaultPrintIndex > 0) setVaultPrintIndex(vaultPrintIndex-1);
+                else prevStep('vault_design');
+              }}
+            />
+
+            {vaultPrints.filter(Boolean).length === 10 && (
+              <button onClick={()=>nextStep('vault_design')} style={{
+                width:'100%',marginTop:12,padding:14,
+                background:'#4ADE80',color:'#000',border:'none',
+                borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',
+              }}>
+                All 10 prints designed — continue →
+              </button>
+            )}
+
+            <p style={{fontSize:11,color:'#555',textAlign:'center',marginTop:8}}>
+              {vaultPrints.filter(Boolean).length}/10 prints designed ·
+              tap a number above to jump to any print
+            </p>
+          </div>
+        )}
+        
         {/* STEP: FULFILLMENT */}
         {step==='fulfillment' && (
           <div>
@@ -520,7 +670,13 @@ export default function GradEventPage() {
                 ...addons.map(id=>{ const a=ADDONS.find(x=>x.id===id); return [a?.name||'',`+$${a?.price}`]; }),
                 ['Supporting',   selectedCreator?`${selectedCreator.display_name} · ${selectedCreator.school_name}`:'General fund'],
                 ['Memory clip',  mediaFile?`${mediaType} recorded`:'Not recorded'],
-                ['Photo design', editorState?'Designed':'Not designed'],
+                ['Photo design', 
+                  selectedBundle?.id==='vault'
+                    ? `${vaultPrints.filter(Boolean).length}/10 prints designed`
+                    : selectedBundle?.id==='drop'
+                    ? editorState?`1 design × 10 copies${dropQR?' + QR clip':''}`:'Not designed'
+                    : editorState?'Designed':'Not designed'
+                ],
                 ['Sticker sheet',stickerData?'Designed':selectedBundle.hasSticker?'Not designed':'Not included'],
                 ['Button/magnet',buttonSize?BUTTON_SIZES.find(s=>s.id===buttonSize)?.label||'':selectedBundle.hasButton?'Not selected':'Not included'],
                 ['Delivery',     fulfillment==='pickup'?'Pick up at booth':`Ship to ${form.city}, ${form.state}`],

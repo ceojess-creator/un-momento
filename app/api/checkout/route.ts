@@ -132,6 +132,9 @@ export async function POST(request: Request) {
         holo_upgrade:    body.holo_upgrade    ? 'true' : '',
         holo_style_sku:  body.holo_style_sku  || '',
         holo_style_name: body.holo_style_name || '',
+        print_count:    String(body.print_count    || 1),
+        is_multi_print: body.is_multi_print ? 'true' : '',
+        drop_qr:        body.drop_qr        ? 'true' : '',
       },
     });
 

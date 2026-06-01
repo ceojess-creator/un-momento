@@ -529,6 +529,8 @@ export default function Home() {
               { name:'Momento Classic',   price:'$28', items:'Print + sticker sheet + QR',                   popular:true  },
               { name:'Momento Bundle',    price:'$45', items:'Print + stickers + button + jacket',           popular:false },
               { name:'Momento Signature', price:'$58', items:'Print + stickers + button + jacket + marker + QR video', popular:false },
+              { name:'Momento Drop',  price:'$25', items:'1 design × 10 prints — perfect for handing out',   popular:false },
+              { name:'Momento Vault', price:'$45', items:'10 unique prints — your memory highlight reel',    popular:false },
             ].map(b => (
               <div key={b.name} style={{
                 background: b.popular ? '#0d1f0d' : '#111', borderRadius: 12,

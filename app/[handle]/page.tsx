@@ -20,8 +20,7 @@ export default async function CreatorPage({
     .from('creator_profiles')
     .select('*')
     .eq('handle', handle)
-    .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   console.log('[storefront] creator:', creator?.display_name, 'error:', error?.message);
 

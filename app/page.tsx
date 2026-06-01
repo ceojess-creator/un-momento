@@ -148,9 +148,10 @@ export default function Home() {
           fontSize: 'clamp(16px, 2.5vw, 20px)', color: '#aaa', maxWidth: 560,
           lineHeight: 1.75, margin: '0 0 16px',
         }}>
-          Instant photo prints, die-cut stickers, custom buttons,
-          and QR memory clips — designed by you, shipped anywhere
-          in the US in 4–5 days.
+          Print any memory that deserves to live in the real world —
+          graduation, birthdays, snapshots, year-in-review collages,
+          or your favorite filtered photo. Die-cut stickers, custom buttons,
+          nd QR memory clips included. Ships anywhere in the US in 4–5 days.
         </p>
 
         {totalRaised > 0 && (
@@ -222,8 +223,10 @@ export default function Home() {
           </div>
           <div style={{ paddingLeft: 44 }}>
             <p style={{ fontSize: 14, color: '#888', lineHeight: 1.8, margin: '0 0 16px' }}>
-              Pick a bundle, upload your graduation photo, record a voice or video message,
-              and design your print. Ships anywhere in the US in 4–5 business days.
+              Pick a bundle, upload any photo from your camera roll — graduation day,
+              a year-in-review collage, a Snapchat memory, or your favorite group shot.
+              Design your print, record a voice or video message, and we ship it anywhere
+              in the US in 4–5 business days.
             </p>
             <div style={{ display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
@@ -231,7 +234,7 @@ export default function Home() {
               {[
                 { n:'01', t:'Pick a bundle',       d:'From $18' },
                 { n:'02', t:'Record your message', d:'QR links forever' },
-                { n:'03', t:'Design your print',   d:'Up to 6 photos' },
+                { n:'03', t:'Design your print',   d:'Any photo, any memory' },
                 { n:'04', t:'We ship it',          d:'4–5 business days' },
               ].map(s => (
                 <div key={s.n} style={{ background: '#111', borderRadius: 10,
@@ -270,9 +273,10 @@ export default function Home() {
           </div>
           <div style={{ paddingLeft: 44 }}>
             <p style={{ fontSize: 14, color: '#888', lineHeight: 1.8, margin: '0 0 16px' }}>
-              Graduating in Spring 2026? Sign up, get your unique storefront link, and share it.
-              Every order placed through your link earns you 10% — and 10% goes straight
-              to your school's PTSO.
+              Spring 2026 is just the beginning. Sign up as a creator, get your unique
+              storefront link, and share it. Every order earns you 10% — and 10% goes
+              straight to your school's PTSO. New campaigns launching beyond graduation —
+              birthdays, sports seasons, class reunions, and more. Creatorship grows with every event.
             </p>
             <div style={{ background: '#0d1f0d', border: '1px solid rgba(74,222,128,0.2)',
                           borderRadius: 10, padding: '16px', marginBottom: 16 }}>
@@ -364,8 +368,9 @@ export default function Home() {
                       margin: '0 0 40px', maxWidth: 560,
                       marginLeft: 'auto', marginRight: 'auto' }}>
             Every print includes a QR code on the face — scannable from inside a frame, forever.
-            Record a message to your future self. Hear it at your 1-year, 5-year, 10-year
-            anniversary. It never expires.
+            Record a message, attach a memory, link a playlist. Hear it at your 1-year,
+            5-year, 10-year anniversary. It never expires. Every photo you print becomes
+            a living memory.
           </p>
           <div style={{ display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))',
@@ -406,7 +411,8 @@ export default function Home() {
         </h2>
         <p style={{ fontSize: 14, color: '#888', textAlign: 'center',
                     margin: '0 0 28px', lineHeight: 1.7 }}>
-          Order through their link and 10% goes to their school automatically.
+          Order any print through their link and 10% goes to their school automatically.
+          Any photo, any memory — every purchase gives back.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
           <input style={inp}
@@ -514,7 +520,7 @@ export default function Home() {
           </p>
           <h2 style={{ fontSize: 'clamp(22px, 4vw, 32px)', fontWeight: 500,
                        textAlign: 'center', margin: '0 0 40px', letterSpacing: '-0.01em' }}>
-            Four bundles. One unforgettable moment.
+            Four bundles. Every memory worth keeping.
           </h2>
           <div style={{ display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 10 }}>

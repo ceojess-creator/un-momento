@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
       // Add-on line items
       for (const addonId of item.addons) {
-        const addonPrice = {
+        const ADDON_PRICES: Record<string,number> = {
           qr_video:        10,
           card_jacket:     5,
           metallic_marker: 4,
@@ -64,7 +64,8 @@ export async function POST(request: Request) {
           extra_print:     10,
           extra_sticker:   12,
           holo_upgrade:    2,
-        }[addonId] || 0;
+        };
+        const addonPrice = ADDON_PRICES[addonId] || 0;
 
         if (addonPrice > 0) {
           lineItems.push({

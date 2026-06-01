@@ -21,6 +21,8 @@ const PRODIGI_SKUS: Record<string, string> = {
 interface ProdigiOrderPayload {
   order_id:         string;
   print_url:        string;
+  quantity?:        number;
+  print_index?:     number;
   recipient_name:   string;
   recipient_email:  string;
   recipient_phone?: string;
@@ -31,7 +33,7 @@ interface ProdigiOrderPayload {
   zip:              string;
   country:          string;
   bundle_id:        string;
-  orientation:      'portrait' | 'landscape';
+  orientation?:     'portrait' | 'landscape';
 }
 
 export async function POST(request: Request) {
@@ -42,6 +44,7 @@ export async function POST(request: Request) {
       recipient_phone, address_line1, address_line2,
       city, state, zip, country = 'US',
       bundle_id = 'essential', orientation = 'landscape',
+      quantity = 1, print_index,
     } = body;
 
     if (!order_id || !print_url || !recipient_name || !address_line1) {
@@ -52,6 +55,14 @@ export async function POST(request: Request) {
     }
 
     const sku = PRODIGI_SKUS[bundle_id] || 'GLOBAL-PHO-4X6-PRO';
+
+    // Add Drop and Vault to SKU map
+    const SKU_MAP: Record<string,string> = {
+      ...PRODIGI_SKUS,
+      'drop':  'GLOBAL-PHO-4X6-PRO',
+      'vault': 'GLOBAL-PHO-4X6-PRO',
+    };
+    const resolvedSku = SKU_MAP[bundle_id] || 'GLOBAL-PHO-4X6-PRO';
 
     // Build Prodigi order
     const prodigiPayload = {
@@ -72,9 +83,9 @@ export async function POST(request: Request) {
       },
       items: [
         {
-          merchantReference: `${order_id}-print`,
-          sku,
-          copies:     1,
+          merchantReference: print_index ? `${order_id}-print-${print_index}` : `${order_id}-print`,
+          sku: resolvedSku,
+          copies: quantity,
           sizing:     'fillPrintArea',
           attributes: {
             finish: 'Gloss',
@@ -137,7 +148,7 @@ export async function POST(request: Request) {
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
               <h2 style="color: #0f172a;">Your order is being printed!</h2>
               <p>Hi ${recipient_name.split(' ')[0]},</p>
-              <p>Your graduation keepsake print has been submitted to our print partner
+              <p>Your ${quantity > 1 ? `${quantity} prints have` : 'print has'} been submitted to our print partner
               and will ship within 2–4 business days.</p>
               <p><strong>Shipping to:</strong><br/>
               ${address_line1}${address_line2 ? ', ' + address_line2 : ''}<br/>

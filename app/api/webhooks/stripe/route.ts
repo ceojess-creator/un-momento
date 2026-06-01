@@ -151,30 +151,71 @@ export async function POST(request: Request) {
 
       // ── Prodigi — ship photo print ────────────────────────
       if (meta.fulfillment_type === 'ship' && orderId) {
-        const printUrl = meta.print_preview_url;
+        const printUrl   = meta.print_preview_url;
+        const bundleId   = meta.bundle_id || 'essential';
+        const printCount = parseInt(meta.print_count || '1');
+        const isVault    = bundleId === 'vault';
+        const isDrop     = bundleId === 'drop';
+
         if (printUrl && meta.ship_address) {
           try {
-            const prodigiRes = await fetch(
-              `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
-              {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  order_id:        orderId,
-                  print_url:       printUrl,
-                  recipient_name:  meta.buyer_name   || '',
-                  recipient_email: meta.buyer_email  || '',
-                  recipient_phone: meta.buyer_phone  || '',
-                  address_line1:   meta.ship_address || '',
-                  city:            meta.ship_city    || '',
-                  state:           meta.ship_state   || '',
-                  zip:             meta.ship_zip     || '',
-                  bundle_id:       meta.bundle_id    || 'essential',
-                }),
+            if (isVault) {
+              // Vault — submit 10 individual files, 1 copy each
+              const vaultPrints = JSON.parse(meta.vault_prints || '[]') as string[];
+              for (let i = 0; i < vaultPrints.length; i++) {
+                const vaultUrl = vaultPrints[i];
+                if (!vaultUrl) continue;
+                const prodigiRes = await fetch(
+                  `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
+                  {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      order_id:        orderId,
+                      print_url:       vaultUrl,
+                      quantity:        1,
+                      recipient_name:  meta.buyer_name   || '',
+                      recipient_email: meta.buyer_email  || '',
+                      recipient_phone: meta.buyer_phone  || '',
+                      address_line1:   meta.ship_address || '',
+                      city:            meta.ship_city    || '',
+                      state:           meta.ship_state   || '',
+                      zip:             meta.ship_zip     || '',
+                      bundle_id:       bundleId,
+                      print_index:     i + 1,
+                    }),
+                  }
+                );
+                const prodigiData = await prodigiRes.json();
+                console.log(`[webhook] Prodigi Vault print ${i+1}/10:`, prodigiData.prodigi_order_id || prodigiData.error);
+                // Small delay between submissions
+                await new Promise(r => setTimeout(r, 300));
               }
-            );
-            const prodigiData = await prodigiRes.json();
-            console.log(`[webhook] Prodigi submitted:`, prodigiData.prodigi_order_id || prodigiData.error);
+            } else {
+              // Standard or Drop — 1 file, quantity 1 or 10
+              const prodigiRes = await fetch(
+                `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
+                {
+                  method:  'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    order_id:        orderId,
+                    print_url:       printUrl,
+                    quantity:        isDrop ? printCount : 1,
+                    recipient_name:  meta.buyer_name   || '',
+                    recipient_email: meta.buyer_email  || '',
+                    recipient_phone: meta.buyer_phone  || '',
+                    address_line1:   meta.ship_address || '',
+                    city:            meta.ship_city    || '',
+                    state:           meta.ship_state   || '',
+                    zip:             meta.ship_zip     || '',
+                    bundle_id:       bundleId,
+                  }),
+                }
+              );
+              const prodigiData = await prodigiRes.json();
+              console.log(`[webhook] Prodigi submitted (qty ${isDrop?printCount:1}):`, prodigiData.prodigi_order_id || prodigiData.error);
+            }
           } catch (e) {
             console.error('[webhook] Prodigi failed:', e);
           }

@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe           from 'stripe';
 import { headers }      from 'next/headers';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+const s3 = new S3Client({
+  region:   'auto',
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId:     process.env.CLOUDFLARE_R2_ACCESS_KEY!,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY!,
+  },
+});
 
 const stripe   = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const supabase = createClient(
@@ -102,7 +113,7 @@ export async function POST(request: Request) {
           const item = cartItems[i];
           const bundleId    = item.bundleId      || '';
           const fulfType    = item.fulfillment   || 'ship';
-          const printUrl    = item.editorState?.dataUrl || null;
+          const rawPrintUrl = item.editorState?.dataUrl || null;
           const stickerUrl  = item.stickerData?.dataUrl || null;
           const buttonUrl   = item.buttonDesign?.dataUrl || null;
           const mediaUrl    = item.mediaUrl      || null;
@@ -407,7 +418,33 @@ export async function POST(request: Request) {
 
       // ── Prodigi — ship photo print ────────────────────────
       if (meta.fulfillment_type === 'ship' && orderId) {
-        const printUrl   = meta.print_preview_url;
+        const rawPrintUrl = item.editorState?.dataUrl || null;
+        let printUrl: string | null = null;
+        if (rawPrintUrl?.startsWith('data:image/')) {
+          try {
+            const match = rawPrintUrl.match(/^data:(image\/\w+);base64,(.+)$/s);
+            if (match) {
+              const mimeType = match[1];
+              const ext      = mimeType.split('/')[1];
+              const buffer   = Buffer.from(match[2], 'base64');
+              const key      = `orders/${bundleId}-${Date.now()}/print_preview.${ext}`;
+              await s3.send(new PutObjectCommand({
+                Bucket:      process.env.CLOUDFLARE_R2_BUCKET!,
+                Key:         key,
+                Body:        buffer,
+                ContentType: mimeType,
+              }));
+              printUrl = await getSignedUrl(s3, new GetObjectCommand({
+                Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
+                Key:    key,
+              }), { expiresIn: 86400 * 30 });
+            }
+          } catch (err: any) {
+            console.error('[webhook] print preview upload failed:', err.message);
+          }
+        } else {
+          printUrl = rawPrintUrl;
+        }
         const bundleId   = meta.bundle_id || 'essential';
         const printCount = parseInt(meta.print_count || '1');
         const isVault    = bundleId === 'vault';

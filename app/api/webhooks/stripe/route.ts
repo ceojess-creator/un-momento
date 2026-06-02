@@ -163,11 +163,13 @@ export async function POST(request: Request) {
 
             // Credit referral
             if (creator) {
-              await supabase.rpc('credit_referral', {
-                p_order_id:       cartOrderId,
-                p_creator_handle: creator,
-                p_order_total:    orderTotal / cartItems.length,
-              }).catch(e => console.error('[webhook] referral error:', e.message));
+              try {
+                await supabase.rpc('credit_referral', {
+                  p_order_id:       cartOrderId,
+                  p_creator_handle: creator,
+                  p_order_total:    orderTotal / cartItems.length,
+                });
+              } catch(e:any) { console.error('[webhook] referral error:', e.message); }
             }
 
             // Submit to Prodigi if ship
@@ -232,21 +234,25 @@ export async function POST(request: Request) {
 
             // Classify order
             if (buyerEmail && bundleId) {
-              await supabase.rpc('classify_order', {
-                p_order_id:    cartOrderId,
-                p_buyer_email: buyerEmail,
-                p_bundle_id:   bundleId,
-                p_is_onsite:   fulfType === 'pickup',
-              }).catch(e => console.error('[webhook] classify error:', e.message));
+              try {
+                await supabase.rpc('classify_order', {
+                  p_order_id:    cartOrderId,
+                  p_buyer_email: buyerEmail,
+                  p_bundle_id:   bundleId,
+                  p_is_onsite:   fulfType === 'pickup',
+                });
+              } catch(e:any) { console.error('[webhook] classify error:', e.message); }
             }
 
             // Deduct inventory
-            await supabase.rpc('deduct_order_inventory', {
-              p_bundle_id:   bundleId,
-              p_addon_ids:   addons,
-              p_button_size: buttonSize,
-              p_fulfillment: fulfType,
-            }).catch(e => console.error('[webhook] inventory error:', e.message));
+            try {
+              await supabase.rpc('deduct_order_inventory', {
+                p_bundle_id:   bundleId,
+                p_addon_ids:   addons,
+                p_button_size: buttonSize,
+                p_fulfillment: fulfType,
+              });
+            } catch(e:any) { console.error('[webhook] inventory error:', e.message); }
 
           } catch (itemErr: any) {
             console.error(`[webhook] cart item ${i} error:`, itemErr.message);

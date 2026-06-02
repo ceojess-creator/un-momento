@@ -126,6 +126,34 @@ export async function POST(request: Request) {
           const addons      = item.addons        || [];
           const creator     = item.creatorHandle || null;
 
+          // Upload base64 print preview to R2
+          let printUrl: string | null = null;
+          if (rawPrintUrl?.startsWith('data:image/')) {
+            try {
+              const match = rawPrintUrl.match(/^data:(image\/\w+);base64,(.+)$/s);
+              if (match) {
+                const mimeType = match[1];
+                const ext      = mimeType.split('/')[1];
+                const buffer   = Buffer.from(match[2], 'base64');
+                const key      = `orders/${bundleId}-${Date.now()}/print_preview.${ext}`;
+                await s3.send(new PutObjectCommand({
+                  Bucket:      process.env.CLOUDFLARE_R2_BUCKET!,
+                  Key:         key,
+                  Body:        buffer,
+                  ContentType: mimeType,
+                }));
+                printUrl = await getSignedUrl(s3, new GetObjectCommand({
+                  Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
+                  Key:    key,
+                }), { expiresIn: 86400 * 30 });
+              }
+            } catch (err: any) {
+              console.error('[webhook] print preview upload failed:', err.message);
+            }
+          } else {
+            printUrl = rawPrintUrl;
+          }
+
           try {
             const { data: cartOrder, error: cartOrderError } = await supabase
               .from('orders')
@@ -416,35 +444,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── Prodigi — ship photo print ────────────────────────
+// ── Prodigi — ship photo print ────────────────────────
       if (meta.fulfillment_type === 'ship' && orderId) {
-        const rawPrintUrl = item.editorState?.dataUrl || null;
-        let printUrl: string | null = null;
-        if (rawPrintUrl?.startsWith('data:image/')) {
-          try {
-            const match = rawPrintUrl.match(/^data:(image\/\w+);base64,(.+)$/s);
-            if (match) {
-              const mimeType = match[1];
-              const ext      = mimeType.split('/')[1];
-              const buffer   = Buffer.from(match[2], 'base64');
-              const key      = `orders/${bundleId}-${Date.now()}/print_preview.${ext}`;
-              await s3.send(new PutObjectCommand({
-                Bucket:      process.env.CLOUDFLARE_R2_BUCKET!,
-                Key:         key,
-                Body:        buffer,
-                ContentType: mimeType,
-              }));
-              printUrl = await getSignedUrl(s3, new GetObjectCommand({
-                Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
-                Key:    key,
-              }), { expiresIn: 86400 * 30 });
-            }
-          } catch (err: any) {
-            console.error('[webhook] print preview upload failed:', err.message);
-          }
-        } else {
-          printUrl = rawPrintUrl;
-        }
+        const printUrl = meta.print_preview_url || null;
         const bundleId   = meta.bundle_id || 'essential';
         const printCount = parseInt(meta.print_count || '1');
         const isVault    = bundleId === 'vault';

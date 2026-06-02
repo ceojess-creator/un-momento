@@ -109,7 +109,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
 
   function getDims() {
     const W = wrapRef.current?.clientWidth || 360;
-    return orientation === 'l' ? { W, H: Math.round(W*2/3) } : { W: Math.round(W*2/3), H: W };
+    return orientation === 'l' ? { W, H: Math.round(W*0.625) } : { W: Math.round(W*0.625), H: W };
   }
 
   const draw = useCallback(() => {

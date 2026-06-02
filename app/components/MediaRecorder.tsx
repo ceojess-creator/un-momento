@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_SECONDS = 15;
+const MAX_SECONDS = 17;
 
 type RecordingState = 'idle' | 'countdown' | 'recording' | 'preview' | 'done';
 type MediaMode      = 'video' | 'audio';

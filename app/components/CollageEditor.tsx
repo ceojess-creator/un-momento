@@ -23,19 +23,21 @@ const GAP = 2;
 let _id = 0;
 
 interface CollageEditorProps {
-  onComplete: (dataUrl: string, slots: SlotData[]) => void;
-  onBack:     () => void;
+  onComplete:       (dataUrl: string, slots: SlotData[]) => void;
+  onBack:           () => void;
   defaultGradName?: string;
   defaultSchool?:   string;
+  mediaUrl?:        string | null; // R2 key e.g. "media/abc123.mp4"
 }
 
-export default function CollageEditor({ onComplete, onBack, defaultGradName='', defaultSchool='' }: CollageEditorProps) {
+export default function CollageEditor({ onComplete, onBack, defaultGradName='', defaultSchool='', mediaUrl=null }: CollageEditorProps) {
   const wrapRef      = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Drag state refs (not in history)
+  // Refs (not in history)
   const activeSlotRef = useRef(0);
+  const qrImgRef      = useRef<HTMLImageElement|null>(null);
   const dragRef = useRef<{
     type:       'slot_pan' | 'slot_move' | 'overlay' | 'shape';
     id:         number;
@@ -45,7 +47,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     startPanX?: number;
     startPanY?: number;
   } | null>(null);
-  
+
   const editor = useEditorHistory({
     slots:    Array.from({ length: 6 }, () => ({ ...DEFAULT_SLOT })),
     overlays: [],
@@ -75,6 +77,35 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   const tpl        = TEMPLATES.find(t => t.id === templateId)!;
   const totalSlots = tpl.slots.length;
   const filled     = state.slots.filter((s,i) => i < totalSlots && s.img).length;
+
+  // ── Generate QR code whenever mediaUrl changes ─────────────────────────────
+  useEffect(() => {
+    if (!mediaUrl) {
+      qrImgRef.current = null;
+      return;
+    }
+    // mediaUrl is the R2 key e.g. "media/abc123.mp4"
+    // Extract the nanoid (filename without extension) to build the viewer URL
+    const mediaId = mediaUrl.split('/').pop()?.split('.')[0] || '';
+    const qrUrl   = `https://unmomentoprints.com/v/?media=${mediaId}`;
+
+    import('qrcode').then(mod => {
+      const QRCode = (mod as any).default ?? mod;
+      QRCode.toDataURL(qrUrl, {
+        width:  300,
+        margin: 1,
+        color:  { dark: '#000000', light: '#ffffff' },
+      }).then((dataUrl: string) => {
+        const img = new window.Image();
+        img.onload = () => {
+          qrImgRef.current = img;
+          draw(); // redraw canvas with real QR
+        };
+        img.src = dataUrl;
+      }).catch(console.error);
+    }).catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaUrl]);
 
   function getDims() {
     const W = wrapRef.current?.clientWidth || 360;
@@ -210,28 +241,52 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       ctx.restore();
     });
 
-    // QR strip
+    // ── QR / border strip ────────────────────────────────────────────────────
     const STRIP = Math.round(H*.1);
+
     if (qr==='border') {
+      // White strip
       ctx.fillStyle='rgba(255,255,255,0.97)'; ctx.fillRect(0,H-STRIP,W,STRIP);
+      // Label text
       ctx.fillStyle='#333'; ctx.font=`${Math.round(STRIP*.38)}px Arial`;
       ctx.textAlign='left'; ctx.textBaseline='middle';
       const lbl = gradName ? `${gradName}${school?` · ${school}`:''} · unmomentoprints.com` : 'unmomentoprints.com';
-      ctx.fillText(lbl,8,H-STRIP+STRIP/2,W-STRIP-12);
-      const QS=STRIP-4;
-      ctx.fillStyle='#000'; ctx.fillRect(W-QS-2,H-STRIP+2,QS,QS);
-      ctx.fillStyle='#fff'; ctx.font=`${Math.round(QS*.3)}px Arial`;
-      ctx.textAlign='center'; ctx.fillText('QR',W-QS/2-2,H-STRIP+STRIP/2);
-    }
-    if (qr==='corner_br'||qr==='corner_bl') {
-      const QS=Math.round(H*.13), qx=qr==='corner_br'?W-QS-4:4, qy=H-QS-4;
-      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(qx-2,qy-2,QS+4,QS+4);
-      ctx.fillStyle='#000'; ctx.fillRect(qx,qy,QS,QS);
+      ctx.fillText(lbl, 8, H-STRIP+STRIP/2, W-STRIP-12);
+      // QR box
+      const QS = STRIP-4;
+      if (qrImgRef.current) {
+        // Real QR code
+        ctx.drawImage(qrImgRef.current, W-QS-2, H-STRIP+2, QS, QS);
+      } else {
+        // Placeholder until QR loads (or no media)
+        ctx.fillStyle='#ddd';
+        ctx.fillRect(W-QS-2, H-STRIP+2, QS, QS);
+        ctx.fillStyle='#999';
+        ctx.font=`${Math.round(QS*.22)}px Arial`;
+        ctx.textAlign='center';
+        ctx.fillText(mediaUrl ? 'QR…' : 'scan', W-QS/2-2, H-STRIP+STRIP/2);
+      }
     }
 
-    // Safe zone
+    if (qr==='corner_br' || qr==='corner_bl') {
+      const QS = Math.round(H*.13);
+      const qx = qr==='corner_br' ? W-QS-4 : 4;
+      const qy = H-QS-4;
+      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(qx-2, qy-2, QS+4, QS+4);
+      if (qrImgRef.current) {
+        ctx.drawImage(qrImgRef.current, qx, qy, QS, QS);
+      } else {
+        ctx.fillStyle='#000'; ctx.fillRect(qx, qy, QS, QS);
+        ctx.fillStyle='#fff';
+        ctx.font=`${Math.round(QS*.2)}px Arial`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(mediaUrl ? 'QR…' : 'scan', qx+QS/2, qy+QS/2);
+      }
+    }
+
+    // Safe zone indicator
     ctx.strokeStyle='rgba(255,80,80,0.15)'; ctx.lineWidth=.5; ctx.setLineDash([3,3]);
-    ctx.strokeRect(8,8,W-16,H-16-(qr==='border'?STRIP+2:0));
+    ctx.strokeRect(8, 8, W-16, H-16-(qr==='border'?STRIP+2:0));
     ctx.setLineDash([]);
   }, [tpl, state, selectedId, gradName, school, qr, activeSlot, orientation, snapGuides, dragOverSlot]);
 
@@ -280,7 +335,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   }
 
   function startDrag(x:number, y:number) {
-    // Adding shape
     if (addingShape) {
       const sh: Shape = { id:++_id, kind:addingShape, x:x-40, y:y-40, w:80, h:addingShape==='line'?6:80, color:'#4ADE80', borderColor:'#ffffff', borderWidth:0, opacity:100, angle:0 };
       editor.addShape(sh);
@@ -290,7 +344,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       return;
     }
 
-    // Check overlays
     for (let i=state.overlays.length-1;i>=0;i--) {
       const ov=state.overlays[i];
       if (Math.abs(x-ov.x)<50&&Math.abs(y-ov.y)<50) {
@@ -301,7 +354,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       }
     }
 
-    // Check shapes
     for (let i=state.shapes.length-1;i>=0;i--) {
       const sh=state.shapes[i];
       if (x>=sh.x&&x<=sh.x+sh.w&&y>=sh.y&&y<=sh.y+sh.h) {
@@ -312,24 +364,20 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       }
     }
 
-    // Check slot — move handle or pan
     const si = getSlotAt(x,y);
     if (si>=0) {
       const b = getSlotBounds(si);
-      // Move handle (top-left 28×18)
       if (state.slots[si].img && x>=b.x&&x<=b.x+28&&y>=b.y&&y<=b.y+18) {
         dragRef.current={type:'slot_move',id:si,fromSlot:si,sx:x,sy:y};
         setActiveSlot(si); setSelectedId(null); setShowToolbar(false);
         return;
       }
-      // Reset button (top-right 38×18)
       const s=state.slots[si];
       const hasEdits=s.brightness!==100||s.contrast!==100||s.saturation!==100||s.filter!=='none'||s.panX!==0||s.panY!==0||s.zoom!==1;
       if (s.img && hasEdits && x>=b.x+b.w-38&&x<=b.x+b.w&&y>=b.y&&y<=b.y+18) {
         editor.resetSlot(si);
         return;
       }
-      // Pan photo within slot
       if (state.slots[si].img) {
         dragRef.current={type:'slot_pan',id:si,sx:x,sy:y,startPanX:state.slots[si].panX,startPanY:state.slots[si].panY};
         setActiveSlot(si); setSelectedId(null); setShowToolbar(false);
@@ -342,13 +390,10 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   function moveDrag(x:number, y:number) {
     const d=dragRef.current; if (!d) return;
     const {W,H}=getDims();
-
     if (d.type==='overlay') {
       const {x:nx,y:ny,guides}=snapToGrid(x-d.sx,y-d.sy,W,H,snapMode);
       setSnapGuides(guides);
       editor.updateOverlay(d.id,{x:nx+d.sx,y:ny+d.sy});
-      // Don't push every frame — just update visually via state mutation
-      // We'll push on endDrag
     }
     if (d.type==='shape') {
       const {x:nx,y:ny,guides}=snapToGrid(x-d.sx,y-d.sy,W,H,snapMode);
@@ -357,11 +402,9 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     }
     if (d.type==='slot_pan') {
       const dx=x-d.sx, dy=y-d.sy;
-      const slot=state.slots[d.id];
       const b=getSlotBounds(d.id);
       let px=(d.startPanX||0)+dx, py=(d.startPanY||0)+dy;
       if (snapMode==='snap') {
-        // Snap pan to center
         if (Math.abs(px)<12) { px=0; setSnapGuides(g=>({...g,x:b.x+b.w/2})); }
         else setSnapGuides(g=>({...g,x:undefined}));
         if (Math.abs(py)<12) { py=0; setSnapGuides(g=>({...g,y:b.y+b.h/2})); }
@@ -379,17 +422,13 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     const d=dragRef.current;
     if (d?.type==='slot_move' && x!==undefined && y!==undefined) {
       const toSlot=getSlotAt(x,y);
-      if (toSlot>=0 && toSlot!==d.fromSlot) {
-        editor.swapSlots(d.fromSlot!, toSlot);
-      }
+      if (toSlot>=0 && toSlot!==d.fromSlot) editor.swapSlots(d.fromSlot!, toSlot);
     }
     dragRef.current=null; setSnapGuides({}); setDragOverSlot(null);
   }
 
   function handleCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
     const {x,y}=cc(e);
-
-    // Overlays
     for (let i=state.overlays.length-1;i>=0;i--) {
       const ov=state.overlays[i];
       if (Math.abs(x-ov.x)<50&&Math.abs(y-ov.y)<50) {
@@ -397,8 +436,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
         showToolbarAt(x,y,ov.type==='emoji'?'overlay':'text'); return;
       }
     }
-
-    // Shapes
     for (let i=state.shapes.length-1;i>=0;i--) {
       const sh=state.shapes[i];
       if (x>=sh.x&&x<=sh.x+sh.w&&y>=sh.y&&y<=sh.y+sh.h) {
@@ -406,8 +443,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
         showToolbarAt(x,y,'shape'); return;
       }
     }
-
-    // Slots
     setSelectedId(null); setShowToolbar(false);
     const si=getSlotAt(x,y);
     if (si>=0) {
@@ -418,56 +453,59 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const slotIndex = activeSlotRef.current;
-  e.target.value = '';
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const slotIndex = activeSlotRef.current;
+    e.target.value = '';
 
-  let processedFile = file;
+    let processedFile = file;
 
-  // Convert HEIC/HEIF to JPEG (iPhone photos)
-  const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-    file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') ||
-    file.type === '';
+    // Convert HEIC/HEIF to JPEG (iPhone photos often have empty MIME type)
+    const isHeic =
+      file.type === 'image/heic' ||
+      file.type === 'image/heif' ||
+      file.name.toLowerCase().endsWith('.heic') ||
+      file.name.toLowerCase().endsWith('.heif') ||
+      file.type === '';
 
-  if (isHeic) {
-    try {
-      // @ts-ignore
-      const heic2any = (await import('heic2any')).default;
-      const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 }) as Blob;
-      processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
-    } catch (err) {
-      console.error('[editor] HEIC conversion failed', err);
-      // Fall through and try anyway
+    if (isHeic) {
+      try {
+        // @ts-ignore
+        const heic2any = (await import('heic2any')).default;
+        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 }) as Blob;
+        processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      } catch (err) {
+        console.error('[editor] HEIC conversion failed', err);
+        // Fall through and try anyway
+      }
     }
+
+    const mimeType = processedFile.type || 'image/jpeg';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let dataUrl = ev.target?.result as string;
+      if (!dataUrl) return;
+      // Fix data URL prefix if browser didn't detect MIME type
+      if (dataUrl.startsWith('data:application/octet-stream')) {
+        dataUrl = dataUrl.replace('data:application/octet-stream', `data:${mimeType}`);
+      }
+      const img = new window.Image();
+      img.onload = () => {
+        editor.updateSlot(slotIndex, {
+          img,
+          originalSrc: dataUrl,
+          panX: 0, panY: 0, zoom: 1,
+          filter: 'none',
+          brightness: 100, contrast: 100, saturation: 100, opacity: 100,
+        });
+      };
+      img.onerror = () => console.error('[editor] image load failed');
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(processedFile);
   }
 
-  const mimeType = processedFile.type || 'image/jpeg';
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    let dataUrl = ev.target?.result as string;
-    if (!dataUrl) return;
-    if (dataUrl.startsWith('data:application/octet-stream')) {
-      dataUrl = dataUrl.replace('data:application/octet-stream', `data:${mimeType}`);
-    }
-    const img = new window.Image();
-    img.onload = () => {
-      editor.updateSlot(slotIndex, {
-        img,
-        originalSrc: dataUrl,
-        panX: 0, panY: 0, zoom: 1,
-        filter: 'none',
-        brightness: 100, contrast: 100, saturation: 100, opacity: 100,
-      });
-    };
-    img.onerror = () => console.error('[editor] image load failed');
-    img.src = dataUrl;
-  };
-  reader.readAsDataURL(processedFile);
-}
-
   function handleToolbarChange(action: ToolbarAction) {
-    // Photo
     if (selectedType==='photo') {
       const u: Partial<SlotData>={};
       if (action.brightness !== undefined) u.brightness = action.brightness;
@@ -477,8 +515,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       if (action.opacity    !== undefined) u.opacity    = action.opacity;
       if (Object.keys(u).length) editor.updateSlot(activeSlot,u);
     }
-
-    // Overlay/text
     if (selectedType==='text'||selectedType==='overlay') {
       const ov=state.overlays.find(o=>o.id===selectedId); if (!ov) return;
       const u: Partial<Overlay>={};
@@ -492,8 +528,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       if (action.flipX       === true)      u.angle      = -(ov.angle||0);
       if (Object.keys(u).length) editor.updateOverlay(selectedId!,u);
     }
-
-    // Shape
     if (selectedType==='shape') {
       const sh=state.shapes.find(s=>s.id===selectedId); if (!sh) return;
       const u: Partial<Shape>={};
@@ -504,7 +538,6 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       if (action.rotation    !== undefined) u.angle       = action.rotation;
       if (Object.keys(u).length) editor.updateShape(selectedId!,u);
     }
-
     if (action.bringForward) editor.bringForward(selectedId!,selectedType==='shape'?'shape':'overlay');
     if (action.sendBackward) editor.sendBackward(selectedId!,selectedType==='shape'?'shape':'overlay');
     if (action.bgColor !== undefined) editor.setBgColor(action.bgColor);
@@ -542,9 +575,9 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     <button key={id} onClick={()=>setPanel(id)} style={{flex:1,padding:'7px 4px',background:panel===id?'#1a1a1a':'transparent',border:panel===id?'1px solid #444':'1px solid transparent',borderRadius:8,color:panel===id?'#fff':'#666',fontSize:11,cursor:'pointer',fontWeight:500}}>{lbl}</button>
   );
 
-  const activeSlotData   = state.slots[activeSlot];
-  const selectedOv       = state.overlays.find(o=>o.id===selectedId);
-  const selectedShape    = state.shapes.find(s=>s.id===selectedId);
+  const activeSlotData = state.slots[activeSlot];
+  const selectedOv     = state.overlays.find(o=>o.id===selectedId);
+  const selectedShape  = state.shapes.find(s=>s.id===selectedId);
 
   return (
     <div style={{width:'100%',maxWidth:640}}>
@@ -620,6 +653,12 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
       <p style={{fontSize:11,color:'#555',margin:'0 0 10px',textAlign:'center'}}>
         {addingShape?`Click canvas to place ${addingShape}`:'⠿ drag move handle to swap slots · tap photo to adjust · ↺ reset button clears edits'}
       </p>
+
+      {mediaUrl && (
+        <div style={{background:'#0d1f0d',border:'1px solid #4ADE80',borderRadius:8,padding:'8px 12px',fontSize:11,color:'#4ADE80',marginBottom:10,textAlign:'center'}}>
+          ✓ QR memory clip linked — will print on your photo
+        </div>
+      )}
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handlePhotoUpload}/>
 

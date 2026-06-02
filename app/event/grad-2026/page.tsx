@@ -540,7 +540,6 @@ export default function GradEventPage() {
               }
               nextStep('media');
             }}                
-            }
              
               onSkip={()=>nextStep('media')}
             />

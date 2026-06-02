@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const { error: cartError } = await supabase
       .from('pending_carts')
       .insert({
-        cart_ref,
+        cart_ref: cartRef,
         items:      JSON.stringify(items),
         form:       JSON.stringify(form),
         event_slug: event_slug || 'grad-2026',

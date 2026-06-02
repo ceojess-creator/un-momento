@@ -44,6 +44,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     startPanX?: number;
     startPanY?: number;
   } | null>(null);
+  const activeSlotRef = useRef(0);
 
   const editor = useEditorHistory({
     slots:    Array.from({ length: 6 }, () => ({ ...DEFAULT_SLOT })),
@@ -55,6 +56,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   const [orientation,   setOrientation]   = useState<'l'|'p'>('l');
   const [templateId,    setTemplateId]    = useState('single');
   const [activeSlot,    setActiveSlot]    = useState(0);
+  useEffect(() => { activeSlotRef.current = activeSlot; }, [activeSlot]);
   const [snapMode,      setSnapMode]      = useState<SnapMode>('snap');
   const [snapGuides,    setSnapGuides]    = useState<{x?:number;y?:number}>({});
   const [dragOverSlot,  setDragOverSlot]  = useState<number|null>(null);
@@ -416,37 +418,30 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const slotIndex = activeSlotRef.current;
+  e.target.value = '';
 
-    // Read as data URL instead of blob URL for better compatibility
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      if (!dataUrl) return;
-
-      const img = new window.Image();
-      img.onload = () => {
-        const slotIndex = activeSlot;
-        editor.updateSlot(slotIndex, {
-          img,
-          originalSrc: dataUrl,
-          panX:0, panY:0, zoom:1,
-          filter:'none',
-          brightness:100, contrast:100, saturation:100, opacity:100,
-        });
-        // Move to next empty slot
-        setTimeout(() => {
-          const nx = editor.state.slots.findIndex((s,i) => i > slotIndex && i < totalSlots && !s.img);
-          if (nx !== -1) setActiveSlot(nx);
-        }, 0);
-      };
-      img.onerror = () => console.error('[editor] image load failed');
-      img.src = dataUrl;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const dataUrl = ev.target?.result as string;
+    if (!dataUrl) return;
+    const img = new window.Image();
+    img.onload = () => {
+      editor.updateSlot(slotIndex, {
+        img,
+        originalSrc: dataUrl,
+        panX: 0, panY: 0, zoom: 1,
+        filter: 'none',
+        brightness: 100, contrast: 100, saturation: 100, opacity: 100,
+      });
     };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }
+    img.onerror = () => console.error('[editor] image load failed');
+    img.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
 
   function handleToolbarChange(action: ToolbarAction) {
     // Photo

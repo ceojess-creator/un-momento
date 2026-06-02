@@ -29,77 +29,149 @@ export async function POST(request: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const meta    = session.metadata || {};
-      // ── Handle cart orders (multiple items) ───────────────
+      // ── Handle cart orders ────────────────────────────────
       if (meta.is_cart === 'true') {
-        const cartItemCount = parseInt(meta.cart_item_count || '1');
-        const orderTotal    = session.amount_total ? session.amount_total / 100 : 0;
+        const orderTotal = session.amount_total ? session.amount_total / 100 : 0;
+        const cartRef    = meta.cart_ref || null;
 
-        for (let i = 0; i < cartItemCount; i++) {
-          const bundleId   = meta[`item_${i}_bundle`]      || '';
-          const creator    = meta[`item_${i}_creator`]     || null;
-          const fulfType   = meta[`item_${i}_fulfillment`] || 'ship';
-          const addonsStr  = meta[`item_${i}_addons`]      || '[]';
-          const mediaUrl   = meta[`item_${i}_media_url`]   || null;
-          const mediaType  = meta[`item_${i}_media_type`]  || null;
-          const buttonSize = meta[`item_${i}_button_size`] || null;
-          const holoSku    = meta[`item_${i}_holo_sku`]    || null;
-          const holoName   = meta[`item_${i}_holo_name`]   || null;
-          const printUrl   = meta[`item_${i}_print_url`]   || null;
-          const stickerUrl = meta[`item_${i}_sticker_url`] || null;
-          const buttonUrl  = meta[`item_${i}_button_url`]  || null;
-          const printCount = parseInt(meta[`item_${i}_print_count`] || '1');
-          const dropQR     = meta[`item_${i}_drop_qr`] === 'true';
+        // Load full cart data from pending_carts
+        let cartItems: any[] = [];
+        let cartForm:  any   = {};
+
+        if (cartRef) {
+          const { data: pendingCart } = await supabase
+            .from('pending_carts')
+            .select('items, form')
+            .eq('cart_ref', cartRef)
+            .single();
+
+          if (pendingCart) {
+            cartItems = typeof pendingCart.items === 'string'
+              ? JSON.parse(pendingCart.items)
+              : pendingCart.items;
+            cartForm  = typeof pendingCart.form === 'string'
+              ? JSON.parse(pendingCart.form)
+              : pendingCart.form;
+            console.log(`[webhook] loaded cart from DB: ${cartItems.length} items`);
+          }
+        }
+
+        // Fallback to metadata if DB lookup failed
+        if (cartItems.length === 0) {
+          console.warn('[webhook] cart not found in DB — falling back to metadata');
+          const cartItemCount = parseInt(meta.cart_item_count || '0');
+          for (let i = 0; i < cartItemCount; i++) {
+            cartItems.push({
+              bundleId:      meta[`item_${i}_bundle`]      || '',
+              creatorHandle: meta[`item_${i}_creator`]     || null,
+              fulfillment:   meta[`item_${i}_fulfillment`] || 'ship',
+              addons:        JSON.parse(meta[`item_${i}_addons`] || '[]'),
+              buttonSize:    meta[`item_${i}_button_size`] || null,
+              holoStyle:     meta[`item_${i}_holo_sku`]    || null,
+              holoStyleName: meta[`item_${i}_holo_name`]   || '',
+              printCount:    parseInt(meta[`item_${i}_print_count`] || '1'),
+              dropQR:        meta[`item_${i}_drop_qr`] === 'true',
+              mediaUrl:      meta[`item_${i}_media_url`]   || null,
+              mediaType:     meta[`item_${i}_media_type`]  || null,
+              editorState:   null,
+              stickerData:   null,
+              buttonDesign:  null,
+              vaultPrints:   [],
+            });
+          }
+          cartForm = {
+            name:    meta.buyer_name    || '',
+            email:   meta.buyer_email   || '',
+            phone:   meta.buyer_phone   || '',
+            address: meta.ship_address  || '',
+            city:    meta.ship_city     || '',
+            state:   meta.ship_state    || '',
+            zip:     meta.ship_zip      || '',
+          };
+        }
+
+        const buyerName  = cartForm.name    || meta.buyer_name  || session.customer_details?.name || '';
+        const buyerEmail = cartForm.email   || meta.buyer_email || session.customer_email         || '';
+        const buyerPhone = cartForm.phone   || meta.buyer_phone || '';
+        const shipAddr   = cartForm.address || meta.ship_address || session.customer_details?.address?.line1 || '';
+        const shipCity   = cartForm.city    || meta.ship_city   || session.customer_details?.address?.city  || '';
+        const shipState  = cartForm.state   || meta.ship_state  || session.customer_details?.address?.state || '';
+        const shipZip    = cartForm.zip     || meta.ship_zip    || session.customer_details?.address?.postal_code || '';
+
+        for (let i = 0; i < cartItems.length; i++) {
+          const item = cartItems[i];
+          const bundleId    = item.bundleId      || '';
+          const fulfType    = item.fulfillment   || 'ship';
+          const printUrl    = item.editorState?.dataUrl || null;
+          const stickerUrl  = item.stickerData?.dataUrl || null;
+          const buttonUrl   = item.buttonDesign?.dataUrl || null;
+          const mediaUrl    = item.mediaUrl      || null;
+          const mediaType   = item.mediaType     || null;
+          const buttonSize  = item.buttonSize    || null;
+          const holoSku     = item.holoStyle     || null;
+          const holoName    = item.holoStyleName || '';
+          const printCount  = item.printCount    || 1;
+          const dropQR      = item.dropQR        || false;
+          const addons      = item.addons        || [];
+          const creator     = item.creatorHandle || null;
 
           try {
-            const { data: cartOrder } = await supabase
+            const { data: cartOrder, error: cartOrderError } = await supabase
               .from('orders')
               .insert({
-                buyer_name:         meta.buyer_name   || session.customer_details?.name || '',
-                buyer_email:        meta.buyer_email  || session.customer_email || '',
-                buyer_phone:        meta.buyer_phone  || '',
-                ship_address:       meta.ship_address || '',
-                ship_city:          meta.ship_city    || '',
-                ship_state:         meta.ship_state   || '',
-                ship_zip:           meta.ship_zip     || '',
+                buyer_name:         buyerName,
+                buyer_email:        buyerEmail,
+                buyer_phone:        buyerPhone,
+                ship_address:       shipAddr,
+                ship_city:          shipCity,
+                ship_state:         shipState,
+                ship_zip:           shipZip,
                 product_type:       bundleId,
                 stripe_payment_id:  session.payment_intent as string,
                 fulfillment_type:   fulfType,
                 fulfillment_source: fulfType === 'pickup' ? 'local' : 'prodigi',
                 fulfillment_status: fulfType === 'pickup' ? 'queued' : 'pending',
                 campaign_slug:      meta.event_slug || 'grad-2026',
-                referral_code:      creator || null,
+                referral_code:      creator,
                 media_url:          mediaUrl,
                 media_type:         mediaType,
                 print_preview_url:  printUrl,
-                sticker_file_url:   stickerUrl || null,
+                sticker_file_url:   stickerUrl,
                 sticker_status:     stickerUrl ? 'queued' : null,
-                button_file_url:    buttonUrl  || null,
+                button_file_url:    buttonUrl,
                 button_status:      buttonUrl  ? 'queued' : null,
                 button_size:        buttonSize,
                 holo_upgrade:       !!holoSku,
                 holo_style_sku:     holoSku,
                 holo_style_name:    holoName,
                 print_count:        printCount,
-                addons:             addonsStr,
-                tokens_spent:       orderTotal / cartItemCount,
+                addons:             JSON.stringify(addons),
+                tokens_spent:       orderTotal / cartItems.length,
               })
               .select('id')
               .single();
 
+            if (cartOrderError) {
+              console.error(`[webhook] cart item ${i} insert error:`, cartOrderError.message);
+              continue;
+            }
+
             const cartOrderId = cartOrder?.id;
             if (!cartOrderId) continue;
 
+            console.log(`[webhook] cart item ${i+1}/${cartItems.length} created: ${cartOrderId}`);
+
             // Credit referral
-            if (creator && cartOrderId) {
+            if (creator) {
               await supabase.rpc('credit_referral', {
                 p_order_id:       cartOrderId,
                 p_creator_handle: creator,
-                p_order_total:    orderTotal / cartItemCount,
-              });
+                p_order_total:    orderTotal / cartItems.length,
+              }).catch(e => console.error('[webhook] referral error:', e.message));
             }
 
             // Submit to Prodigi if ship
-            if (fulfType === 'ship' && printUrl && meta.ship_address) {
+            if (fulfType === 'ship' && printUrl && shipAddr) {
               await fetch(
                 `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
                 {
@@ -109,53 +181,102 @@ export async function POST(request: Request) {
                     order_id:        cartOrderId,
                     print_url:       printUrl,
                     quantity:        printCount,
-                    recipient_name:  meta.buyer_name   || '',
-                    recipient_email: meta.buyer_email  || '',
-                    recipient_phone: meta.buyer_phone  || '',
-                    address_line1:   meta.ship_address || '',
-                    city:            meta.ship_city    || '',
-                    state:           meta.ship_state   || '',
-                    zip:             meta.ship_zip     || '',
+                    recipient_name:  buyerName,
+                    recipient_email: buyerEmail,
+                    recipient_phone: buyerPhone,
+                    address_line1:   shipAddr,
+                    city:            shipCity,
+                    state:           shipState,
+                    zip:             shipZip,
                     bundle_id:       bundleId,
                   }),
                 }
-              );
+              ).catch(e => console.error('[webhook] prodigi error:', e.message));
+            }
+
+            // Add to print queue if pickup
+            if (fulfType === 'pickup' && printUrl) {
+              const { data: eventPage } = await supabase
+                .from('event_pages').select('id')
+                .eq('slug', meta.event_slug || 'grad-2026').single();
+
+              if (eventPage) {
+                const { data: hardware } = await supabase
+                  .from('event_hardware')
+                  .select('id, asset_tag')
+                  .eq('event_id', eventPage.id)
+                  .eq('device_type', 'photo_printer')
+                  .eq('is_online', true)
+                  .order('queue_depth', { ascending: true })
+                  .limit(1)
+                  .single();
+
+                if (hardware) {
+                  await supabase.from('print_queue').insert({
+                    order_id:       cartOrderId,
+                    event_id:       eventPage.id,
+                    hardware_id:    hardware.id,
+                    asset_tag:      hardware.asset_tag,
+                    print_type:     'photo_print',
+                    file_url:       printUrl,
+                    status:         'queued',
+                    priority:       1,
+                    customer_name:  buyerName,
+                    customer_phone: buyerPhone,
+                    copies:         printCount,
+                  });
+                  console.log(`[webhook] pickup queued for ${hardware.asset_tag}`);
+                }
+              }
             }
 
             // Classify order
-            const buyerEmail = meta.buyer_email || session.customer_email || '';
             if (buyerEmail && bundleId) {
               await supabase.rpc('classify_order', {
                 p_order_id:    cartOrderId,
                 p_buyer_email: buyerEmail,
                 p_bundle_id:   bundleId,
                 p_is_onsite:   fulfType === 'pickup',
-              });
+              }).catch(e => console.error('[webhook] classify error:', e.message));
             }
 
-            console.log(`[webhook] cart item ${i+1}/${cartItemCount} created: ${cartOrderId}`);
+            // Deduct inventory
+            await supabase.rpc('deduct_order_inventory', {
+              p_bundle_id:   bundleId,
+              p_addon_ids:   addons,
+              p_button_size: buttonSize,
+              p_fulfillment: fulfType,
+            }).catch(e => console.error('[webhook] inventory error:', e.message));
+
           } catch (itemErr: any) {
             console.error(`[webhook] cart item ${i} error:`, itemErr.message);
           }
         }
 
+        // Mark cart as processed
+        if (cartRef) {
+          await supabase
+            .from('pending_carts')
+            .update({ processed: true })
+            .eq('cart_ref', cartRef);
+        }
+
         // Create/link buyer account
-        const buyerEmail = meta.buyer_email || session.customer_email;
         if (buyerEmail) {
           const { data: existing } = await supabase
             .from('accounts').select('id').eq('email', buyerEmail).single();
           if (!existing) {
             await supabase.from('accounts').insert({
-              name:            meta.buyer_name || buyerEmail.split('@')[0],
+              name:            buyerName,
               email:           buyerEmail,
-              phone:           meta.buyer_phone || '',
+              phone:           buyerPhone,
               is_creator:      false,
               onboarding_step: 'claim',
             });
           }
         }
 
-        console.log(`[webhook] cart order complete — ${meta.cart_item_count} items`);
+        console.log(`[webhook] cart complete — ${cartItems.length} orders created`);
         return NextResponse.json({ received: true });
       }
       

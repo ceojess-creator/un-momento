@@ -17,14 +17,16 @@ const BUNDLE_NAMES: Record<string,string> = {
   vault:     'Momento Vault',
 };
 
+const ADDON_PRICES: Record<string,number> = {
+  qr_video:10, card_jacket:5, metallic_marker:4,
+  oil_marker:4, extra_print:10, extra_sticker:12, holo_upgrade:2,
+};
+
 const ADDON_NAMES: Record<string,string> = {
-  qr_video:        'QR Video Memory Upgrade',
-  card_jacket:     'Black Card Jacket',
-  metallic_marker: 'Metallic Marker',
-  oil_marker:      'Oil-Based Marker',
-  extra_print:     'Extra Photo Print',
-  extra_sticker:   'Extra Sticker Sheet',
-  holo_upgrade:    'Holographic Button Upgrade',
+  qr_video:'QR Video Memory Upgrade', card_jacket:'Black Card Jacket',
+  metallic_marker:'Metallic Marker', oil_marker:'Oil-Based Marker',
+  extra_print:'Extra Photo Print', extra_sticker:'Extra Sticker Sheet',
+  holo_upgrade:'Holographic Button Upgrade',
 };
 
 export async function POST(request: Request) {
@@ -35,11 +37,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    // Build Stripe line items
+    // ── Save cart to Supabase pending_carts table ──────────────
+    // Store full item data (including dataUrls) in DB
+    // Reference by cart_ref in Stripe metadata
+    const cartRef = `cart_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+
+    const { error: cartError } = await supabase
+      .from('pending_carts')
+      .insert({
+        cart_ref,
+        items:      JSON.stringify(items),
+        form:       JSON.stringify(form),
+        event_slug: event_slug || 'grad-2026',
+        created_at: new Date().toISOString(),
+      });
+
+    if (cartError) {
+      console.error('[cart checkout] failed to save cart:', cartError.message);
+      // Fall through — still try to create session with basic metadata
+    }
+
+    // ── Build Stripe line items ────────────────────────────────
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
     for (const item of items) {
-      // Bundle line item
       lineItems.push({
         price_data: {
           currency:     'usd',
@@ -54,39 +75,25 @@ export async function POST(request: Request) {
         quantity: 1,
       });
 
-      // Add-on line items
-      for (const addonId of item.addons) {
-        const ADDON_PRICES: Record<string,number> = {
-          qr_video:        10,
-          card_jacket:     5,
-          metallic_marker: 4,
-          oil_marker:      4,
-          extra_print:     10,
-          extra_sticker:   12,
-          holo_upgrade:    2,
-        };
+      for (const addonId of (item.addons || [])) {
         const addonPrice = ADDON_PRICES[addonId] || 0;
-
         if (addonPrice > 0) {
           lineItems.push({
             price_data: {
-              currency:     'usd',
-              unit_amount:  addonPrice * 100,
-              product_data: {
-                name: ADDON_NAMES[addonId] || addonId,
-              },
+              currency:    'usd',
+              unit_amount: addonPrice * 100,
+              product_data: { name: ADDON_NAMES[addonId] || addonId },
             },
             quantity: 1,
           });
         }
       }
 
-      // Drop QR add-on
       if (item.dropQR) {
         lineItems.push({
           price_data: {
-            currency:     'usd',
-            unit_amount:  500,
+            currency:    'usd',
+            unit_amount: 500,
             product_data: { name: 'QR Memory Clip (Momento Drop)' },
           },
           quantity: 1,
@@ -94,10 +101,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build metadata for webhook — serialize cart items
-    // Stripe metadata values must be strings under 500 chars
-    // We store each item's key data separately
+    // ── Minimal metadata — reference cart in DB ────────────────
     const metadata: Record<string,string> = {
+      cart_ref,
+      is_cart:         'true',
       cart_item_count: String(items.length),
       event_slug:      event_slug || 'grad-2026',
       buyer_name:      form.name      || '',
@@ -107,29 +114,21 @@ export async function POST(request: Request) {
       ship_city:       form.city      || '',
       ship_state:      form.state     || '',
       ship_zip:        form.zip       || '',
-      grad_name:       form.grad_name || '',
-      school:          form.school    || '',
-      is_cart:         'true',
     };
 
-    // Store each cart item's essential data in metadata
-    // (limited to 50 keys in Stripe metadata)
-    items.slice(0, 10).forEach((item: any, i: number) => {
-      metadata[`item_${i}_bundle`]      = item.bundleId;
+    // Also store per-item non-image data in metadata as backup
+    items.slice(0,5).forEach((item: any, i: number) => {
+      metadata[`item_${i}_bundle`]      = item.bundleId       || '';
       metadata[`item_${i}_creator`]     = item.creatorHandle  || '';
-      metadata[`item_${i}_school`]      = item.schoolName     || '';
       metadata[`item_${i}_fulfillment`] = item.fulfillment    || 'ship';
-      metadata[`item_${i}_addons`]      = JSON.stringify(item.addons || []).slice(0,490);
-      metadata[`item_${i}_media_url`]   = item.mediaUrl       || '';
-      metadata[`item_${i}_media_type`]  = item.mediaType      || '';
+      metadata[`item_${i}_addons`]      = JSON.stringify(item.addons || []).slice(0,200);
       metadata[`item_${i}_button_size`] = item.buttonSize     || '';
       metadata[`item_${i}_holo_sku`]    = item.holoStyle      || '';
       metadata[`item_${i}_holo_name`]   = item.holoStyleName  || '';
       metadata[`item_${i}_print_count`] = String(item.printCount || 1);
       metadata[`item_${i}_drop_qr`]     = item.dropQR ? 'true' : '';
-      metadata[`item_${i}_sticker_url`] = item.stickerData?.dataUrl?.slice(0,490) || '';
-      metadata[`item_${i}_button_url`]  = item.buttonDesign?.dataUrl?.slice(0,490) || '';
-      metadata[`item_${i}_print_url`]   = item.editorState?.dataUrl?.slice(0,490)  || '';
+      metadata[`item_${i}_media_url`]   = item.mediaUrl       || '';
+      metadata[`item_${i}_media_type`]  = item.mediaType      || '';
     });
 
     const session = await stripe.checkout.sessions.create({

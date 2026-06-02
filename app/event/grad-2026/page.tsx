@@ -207,7 +207,7 @@ export default function GradEventPage() {
       vaultPrints:   vaultPrints.filter(Boolean),
       mediaFile:     null,
       mediaType,
-      mediaUrl:      null,
+      mediaUrl:      mediaUrl,
       fulfillment,
       printCount:    b.printCount,
       isMulti:       b.isMulti,

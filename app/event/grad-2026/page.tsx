@@ -103,6 +103,7 @@ export default function GradEventPage() {
   const [addons,          setAddons]          = useState<string[]>([]);
   const [mediaFile,       setMediaFile]       = useState<File|null>(null);
   const [mediaType,       setMediaType]       = useState<'video'|'audio'|null>(null);
+  const [mediaUrl,        setMediaUrl]        = useState<string|null>(null);
   const [editorState,     setEditorState]     = useState<any>(null);
   const [stickerData,     setStickerData]     = useState<any>(null);
   const [buttonSize,      setButtonSize]      = useState<string|null>(null);
@@ -220,6 +221,7 @@ export default function GradEventPage() {
     setAddons([]);
     setMediaFile(null);
     setMediaType(null);
+    setMediaUrl(null);
     setEditorState(null);
     setStickerData(null);
     setButtonSize(null);
@@ -523,7 +525,23 @@ export default function GradEventPage() {
         {step==='media' && (
           <div>
             <MemoryRecorder
-              onComplete={(file,type)=>{ setMediaFile(file); setMediaType(type); nextStep('media'); }}
+             onComplete={async (file, type) => {
+              setMediaFile(file);
+              setMediaType(type);
+              try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('folder', 'media');
+                const res  = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.key) setMediaUrl(data.key);
+              } catch (e) {
+                console.error('Media upload failed', e);
+              }
+              nextStep('media');
+            }}                
+            }
+             
               onSkip={()=>nextStep('media')}
             />
             <button onClick={()=>prevStep('media')} style={{
@@ -542,6 +560,7 @@ export default function GradEventPage() {
               Design your 4×6 photo print. Any photo, any memory.
             </p>
             <CollageEditor
+              mediaUrl={mediaUrl}
               defaultGradName={selectedCreator?.display_name || ''}
               defaultSchool={selectedCreator?.school_name || ''}
               onComplete={(dataUrl,slots)=>{ setEditorState({dataUrl,slots}); nextStep('design'); }}
@@ -771,6 +790,7 @@ export default function GradEventPage() {
               </div>
             </div>
             <CollageEditor
+              mediaUrl={mediaUrl}
               key={vaultPrintIndex}
               defaultGradName={selectedCreator?.display_name||''}
               defaultSchool={selectedCreator?.school_name||''}

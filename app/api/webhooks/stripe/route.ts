@@ -130,7 +130,7 @@ export async function POST(request: Request) {
           let printUrl: string | null = null;
           if (rawPrintUrl?.startsWith('data:image/')) {
             try {
-              const match = rawPrintUrl.match(/^data:(image\/\w+);base64,(.+)$/s);
+              const match = rawPrintUrl.match(/^data:(image\/[\w+]+);base64,([\s\S]+)$/);
               if (match) {
                 const mimeType = match[1];
                 const ext      = mimeType.split('/')[1];

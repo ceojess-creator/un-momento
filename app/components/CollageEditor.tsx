@@ -432,6 +432,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
 
   if (isHeic) {
     try {
+      // @ts-ignore
       const heic2any = (await import('heic2any')).default;
       const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 }) as Blob;
       processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });

@@ -35,6 +35,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag state refs (not in history)
+  const activeSlotRef = useRef(0);
   const dragRef = useRef<{
     type:       'slot_pan' | 'slot_move' | 'overlay' | 'shape';
     id:         number;
@@ -423,24 +424,34 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   const slotIndex = activeSlotRef.current;
   e.target.value = '';
 
+  // Force correct MIME type if browser didn't detect it
+  const mimeType = file.type || 'image/jpeg';
+  const fixedFile = file.type ? file : new File([file], file.name, { type: mimeType });
+
   const reader = new FileReader();
   reader.onload = (ev) => {
     const dataUrl = ev.target?.result as string;
     if (!dataUrl) return;
+
+    // Fix the data URL prefix if mime type was missing
+    const fixedDataUrl = dataUrl.startsWith('data:application/octet-stream')
+      ? dataUrl.replace('data:application/octet-stream', `data:${mimeType}`)
+      : dataUrl;
+
     const img = new window.Image();
     img.onload = () => {
       editor.updateSlot(slotIndex, {
         img,
-        originalSrc: dataUrl,
+        originalSrc: fixedDataUrl,
         panX: 0, panY: 0, zoom: 1,
         filter: 'none',
         brightness: 100, contrast: 100, saturation: 100, opacity: 100,
       });
     };
     img.onerror = () => console.error('[editor] image load failed');
-    img.src = dataUrl;
+    img.src = fixedDataUrl;
   };
-  reader.readAsDataURL(file);
+  reader.readAsDataURL(fixedFile);
 }
 
   function handleToolbarChange(action: ToolbarAction) {

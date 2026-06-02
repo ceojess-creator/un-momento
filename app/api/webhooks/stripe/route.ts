@@ -145,7 +145,7 @@ export async function POST(request: Request) {
                 printUrl = await getSignedUrl(s3, new GetObjectCommand({
                   Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
                   Key:    key,
-                }), { expiresIn: 86400 * 30 });
+                }), { expiresIn: 86400 * 7 });
               }
             } catch (err: any) {
               console.error('[webhook] print preview upload failed:', err.message);

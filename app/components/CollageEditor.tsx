@@ -242,7 +242,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     });
 
     // ── QR / border strip ────────────────────────────────────────────────────
-    const STRIP = Math.round(H*.1);
+    const STRIP = Math.round(H*.15);
 
     if (qr==='border') {
       // White strip

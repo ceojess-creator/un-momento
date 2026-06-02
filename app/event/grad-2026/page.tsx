@@ -529,19 +529,26 @@ export default function GradEventPage() {
               setMediaFile(file);
               setMediaType(type);
               try {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('folder', 'media');
-                const res  = await fetch('/api/upload', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.key) setMediaUrl(data.key);
+                // Step 1: get presigned upload URL
+                const { uploadUrl, key } = await fetch('/api/upload-url', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ contentType: file.type || 'video/mp4', folder: 'media' }),
+                }).then(r => r.json());
+
+                // Step 2: upload directly to R2 (no Vercel size limit)
+                await fetch(uploadUrl, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': file.type || 'video/mp4' },
+                  body: file,
+                });
+
+                if (key) setMediaUrl(key);
               } catch (e) {
                 console.error('Media upload failed', e);
               }
               nextStep('media');
-            }}                
-             
-              onSkip={()=>nextStep('media')}
+            }}
             />
             <button onClick={()=>prevStep('media')} style={{
               marginTop:8, width:'100%', padding:10,

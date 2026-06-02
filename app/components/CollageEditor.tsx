@@ -423,34 +423,46 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
   const slotIndex = activeSlotRef.current;
   e.target.value = '';
 
-  // Force correct MIME type if browser didn't detect it
-  const mimeType = file.type || 'image/jpeg';
-  const fixedFile = file.type ? file : new File([file], file.name, { type: mimeType });
+  let processedFile = file;
 
+  // Convert HEIC/HEIF to JPEG (iPhone photos)
+  const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+    file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') ||
+    file.type === '';
+
+  if (isHeic) {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 }) as Blob;
+      processedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+    } catch (err) {
+      console.error('[editor] HEIC conversion failed', err);
+      // Fall through and try anyway
+    }
+  }
+
+  const mimeType = processedFile.type || 'image/jpeg';
   const reader = new FileReader();
   reader.onload = (ev) => {
-    const dataUrl = ev.target?.result as string;
+    let dataUrl = ev.target?.result as string;
     if (!dataUrl) return;
-
-    // Fix the data URL prefix if mime type was missing
-    const fixedDataUrl = dataUrl.startsWith('data:application/octet-stream')
-      ? dataUrl.replace('data:application/octet-stream', `data:${mimeType}`)
-      : dataUrl;
-
+    if (dataUrl.startsWith('data:application/octet-stream')) {
+      dataUrl = dataUrl.replace('data:application/octet-stream', `data:${mimeType}`);
+    }
     const img = new window.Image();
     img.onload = () => {
       editor.updateSlot(slotIndex, {
         img,
-        originalSrc: fixedDataUrl,
+        originalSrc: dataUrl,
         panX: 0, panY: 0, zoom: 1,
         filter: 'none',
         brightness: 100, contrast: 100, saturation: 100, opacity: 100,
       });
     };
     img.onerror = () => console.error('[editor] image load failed');
-    img.src = fixedDataUrl;
+    img.src = dataUrl;
   };
-  reader.readAsDataURL(fixedFile);
+  reader.readAsDataURL(processedFile);
 }
 
   function handleToolbarChange(action: ToolbarAction) {

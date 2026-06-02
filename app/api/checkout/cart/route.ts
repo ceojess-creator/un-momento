@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
     // ── Minimal metadata — reference cart in DB ────────────────
     const metadata: Record<string,string> = {
-      cart_ref,
+      cart_ref: cartRef,
       is_cart:         'true',
       cart_item_count: String(items.length),
       event_slug:      event_slug || 'grad-2026',

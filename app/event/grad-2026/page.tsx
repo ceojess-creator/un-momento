@@ -546,6 +546,7 @@ export default function GradEventPage() {
                 nextStep('media'); // advance anyway so user isn't stuck
               }
             }}
+            onSkip={()=>nextStep('media')}
             />
             <button onClick={()=>prevStep('media')} style={{
               marginTop:8, width:'100%', padding:10,

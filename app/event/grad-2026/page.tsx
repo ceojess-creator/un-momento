@@ -549,6 +549,7 @@ export default function GradEventPage() {
               }
               nextStep('media');
             }}
+            onSkip={()=>nextStep('media')}
             />
             <button onClick={()=>prevStep('media')} style={{
               marginTop:8, width:'100%', padding:10,

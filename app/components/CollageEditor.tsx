@@ -45,8 +45,7 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     startPanX?: number;
     startPanY?: number;
   } | null>(null);
-  const activeSlotRef = useRef(0);
-
+  
   const editor = useEditorHistory({
     slots:    Array.from({ length: 6 }, () => ({ ...DEFAULT_SLOT })),
     overlays: [],

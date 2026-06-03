@@ -200,57 +200,68 @@ export async function POST(request: Request) {
 
             console.log(`[webhook] cart item ${i+1}/${cartItems.length} created: ${cartOrderId}`);
 
-            // Send order confirmation notification
-            try {
-              await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notify/order-ready`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  order_id:    cartOrderId,
-                  buyer_name:  buyerName,
-                  buyer_phone: buyerPhone,
-                  buyer_email: buyerEmail,
-                  bundle_id:   bundleId,
-                  fulfillment: fulfType,
-                }),
-              });
-              console.log(`[webhook] notification sent for ${cartOrderId}`);
-            } catch (e: any) {
-              console.error('[webhook] notification error:', e.message);
-            }
-
-// Credit referral
-            if (creator) {
+            // Send order confirmation SMS
+            if (buyerPhone) {
               try {
-                await supabase.rpc('credit_referral', {
-                  p_order_id:       cartOrderId,
-                  p_creator_handle: creator,
-                  p_order_total:    orderTotal / cartItems.length,
-                });
-              } catch(e:any) { console.error('[webhook] referral error:', e.message); }
+                const firstName = buyerName.split(' ')[0] || 'there';
+                const confirmMsg = fulfType === 'pickup'
+                  ? `Hi ${firstName}! 🎓 Your Un Momento order is confirmed! Your print is being prepared. We'll text you when it's ready for pickup. — Un Momento`
+                  : `Hi ${firstName}! 🎓 Your Un Momento order is confirmed! Your print will ship in 4-5 days. — Un Momento`;
+                const cleanPhone = buyerPhone.replace(/\D/g, '');
+                const e164Phone  = cleanPhone.startsWith('1') ? `+${cleanPhone}` : `+1${cleanPhone}`;
+                await fetch(
+                  `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': 'Basic ' + Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64'),
+                      'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                      From: process.env.TWILIO_PHONE_NUMBER!,
+                      To:   e164Phone,
+                      Body: confirmMsg,
+                    }),
+                  }
+                );
+                console.log(`[webhook] confirmation SMS sent to ${e164Phone}`);
+              } catch (e: any) {
+                console.error('[webhook] SMS error:', e.message);
+              }
             }
 
-            // Submit to Prodigi if ship
-            if (fulfType === 'ship' && printUrl && shipAddr) {
-              await fetch(
-                `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
-                {
-                  method:  'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    order_id:        cartOrderId,
-                    print_url:       printUrl,
-                    quantity:        printCount,
-                    recipient_name:  buyerName,
-                    recipient_email: buyerEmail,
-                    recipient_phone: buyerPhone,
-                    address_line1:   shipAddr,
-                    city:            shipCity,
-                    state:           shipState,
-                    zip:             shipZip,
-                    bundle_id:       bundleId,
-                  }),
-                }
+          // Credit referral
+                      if (creator) {
+                        try {
+                          await supabase.rpc('credit_referral', {
+                            p_order_id:       cartOrderId,
+                            p_creator_handle: creator,
+                            p_order_total:    orderTotal / cartItems.length,
+                          });
+                        } catch(e:any) { console.error('[webhook] referral error:', e.message); }
+                      }
+
+                      // Submit to Prodigi if ship
+                      if (fulfType === 'ship' && printUrl && shipAddr) {
+                        await fetch(
+                          `${process.env.NEXT_PUBLIC_SITE_URL}/api/fulfillment/prodigi`,
+                          {
+                            method:  'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              order_id:        cartOrderId,
+                              print_url:       printUrl,
+                              quantity:        printCount,
+                              recipient_name:  buyerName,
+                              recipient_email: buyerEmail,
+                              recipient_phone: buyerPhone,
+                              address_line1:   shipAddr,
+                              city:            shipCity,
+                              state:           shipState,
+                              zip:             shipZip,
+                              bundle_id:       bundleId,
+                            }),
+                          }
               ).catch(e => console.error('[webhook] prodigi error:', e.message));
             }
 

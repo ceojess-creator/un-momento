@@ -242,52 +242,45 @@ export default function CollageEditor({ onComplete, onBack, defaultGradName='', 
     });
 
     // ── QR / border strip ────────────────────────────────────────────────────
-    const STRIP = Math.round(H*.15);
+    const STRIP  = Math.round(H*.15);
+    const BOTTOM = Math.round(H*0.88); // 12% bottom buffer for Liene tear line
 
     if (qr==='border') {
-      // White strip
-      ctx.fillStyle='rgba(255,255,255,0.97)'; ctx.fillRect(0,H-STRIP,W,STRIP);
-      // Label text
-      ctx.fillStyle='#333'; ctx.font=`${Math.round(STRIP*.38)}px Arial`;
-      ctx.textAlign='left'; ctx.textBaseline='middle';
-      const lbl = gradName ? `${gradName}${school?` · ${school}`:''} · unmomentoprints.com` : 'unmomentoprints.com';
-      ctx.fillText(lbl, 8, H-STRIP+STRIP/2, W-STRIP-12);
-      // QR box
-      const QS = STRIP-4;
-      if (qrImgRef.current) {
-        // Real QR code
-        ctx.drawImage(qrImgRef.current, W-QS-2, H-STRIP+2, QS, QS);
-      } else {
-        // Placeholder until QR loads (or no media)
-        ctx.fillStyle='#ddd';
-        ctx.fillRect(W-QS-2, H-STRIP+2, QS, QS);
-        ctx.fillStyle='#999';
-        ctx.font=`${Math.round(QS*.22)}px Arial`;
-        ctx.textAlign='center';
-        ctx.fillText(mediaUrl ? 'QR…' : 'scan', W-QS/2-2, H-STRIP+STRIP/2);
-      }
-    }
+  ctx.fillStyle='rgba(255,255,255,0.97)'; ctx.fillRect(0,BOTTOM-STRIP,W,STRIP);
+  ctx.fillStyle='#333'; ctx.font=`${Math.round(STRIP*.38)}px Arial`;
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  const lbl = gradName ? `${gradName}${school?` · ${school}`:''} · unmomentoprints.com` : 'unmomentoprints.com';
+  ctx.fillText(lbl,8,BOTTOM-STRIP+STRIP/2,W-STRIP-12);
+  const QS=STRIP-4;
+  if (qrImgRef.current) {
+    ctx.drawImage(qrImgRef.current, W-QS-2, BOTTOM-STRIP+2, QS, QS);
+  } else {
+    ctx.fillStyle='#ddd'; ctx.fillRect(W-QS-2, BOTTOM-STRIP+2, QS, QS);
+    ctx.fillStyle='#999'; ctx.font=`${Math.round(QS*.22)}px Arial`;
+    ctx.textAlign='center';
+    ctx.fillText(mediaUrl ? 'QR…' : 'scan', W-QS/2-2, BOTTOM-STRIP+STRIP/2);
+  }
+}
 
-    if (qr==='corner_br' || qr==='corner_bl') {
-      const QS = Math.round(H*.13);
-      const qx = qr==='corner_br' ? W-QS-4 : 4;
-      const qy = H-QS-4;
-      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(qx-2, qy-2, QS+4, QS+4);
-      if (qrImgRef.current) {
-        ctx.drawImage(qrImgRef.current, qx, qy, QS, QS);
-      } else {
-        ctx.fillStyle='#000'; ctx.fillRect(qx, qy, QS, QS);
-        ctx.fillStyle='#fff';
-        ctx.font=`${Math.round(QS*.2)}px Arial`;
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(mediaUrl ? 'QR…' : 'scan', qx+QS/2, qy+QS/2);
-      }
-    }
+if (qr==='corner_br' || qr==='corner_bl') {
+  const QS = Math.round(H*.13);
+  const qx = qr==='corner_br' ? W-QS-4 : 4;
+  const qy = BOTTOM-QS-4;
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(qx-2, qy-2, QS+4, QS+4);
+  if (qrImgRef.current) {
+    ctx.drawImage(qrImgRef.current, qx, qy, QS, QS);
+  } else {
+    ctx.fillStyle='#000'; ctx.fillRect(qx, qy, QS, QS);
+    ctx.fillStyle='#fff'; ctx.font=`${Math.round(QS*.2)}px Arial`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(mediaUrl ? 'QR…' : 'scan', qx+QS/2, qy+QS/2);
+  }
+}
 
-    // Safe zone indicator
-    ctx.strokeStyle='rgba(255,80,80,0.15)'; ctx.lineWidth=.5; ctx.setLineDash([3,3]);
-    ctx.strokeRect(8, 8, W-16, H-16-(qr==='border'?STRIP+2:0));
-    ctx.setLineDash([]);
+// Safe zone
+ctx.strokeStyle='rgba(255,80,80,0.15)'; ctx.lineWidth=.5; ctx.setLineDash([3,3]);
+ctx.strokeRect(8, 8, W-16, BOTTOM-16-(qr==='border'?STRIP+2:0));
+ctx.setLineDash([]);
   }, [tpl, state, selectedId, gradName, school, qr, activeSlot, orientation, snapGuides, dragOverSlot]);
 
   useEffect(() => { draw(); }, [draw]);

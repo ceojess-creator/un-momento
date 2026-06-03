@@ -200,7 +200,26 @@ export async function POST(request: Request) {
 
             console.log(`[webhook] cart item ${i+1}/${cartItems.length} created: ${cartOrderId}`);
 
-            // Credit referral
+            // Send order confirmation notification
+            try {
+              await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notify/order-ready`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  order_id:    cartOrderId,
+                  buyer_name:  buyerName,
+                  buyer_phone: buyerPhone,
+                  buyer_email: buyerEmail,
+                  bundle_id:   bundleId,
+                  fulfillment: fulfType,
+                }),
+              });
+              console.log(`[webhook] notification sent for ${cartOrderId}`);
+            } catch (e: any) {
+              console.error('[webhook] notification error:', e.message);
+            }
+
+// Credit referral
             if (creator) {
               try {
                 await supabase.rpc('credit_referral', {

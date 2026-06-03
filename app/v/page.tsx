@@ -11,8 +11,9 @@ const s3 = new S3Client({
   },
 });
 
-export default async function MediaPage({ searchParams }: { searchParams: { media?: string } }) {
-  const mediaId = searchParams.media;
+export default async function MediaPage({ searchParams }: { searchParams: Promise<{ media?: string }> }) {
+  const { media: mediaId } = await searchParams;
+
   if (!mediaId) redirect('https://unmomentoprints.com');
 
   const extensions = ['mp4', 'mov', 'webm', 'm4v', 'mp3', 'm4a', 'wav'];
@@ -22,13 +23,11 @@ export default async function MediaPage({ searchParams }: { searchParams: { medi
   for (const ext of extensions) {
     const key = `media/${mediaId}.${ext}`;
     try {
-      // HeadObject actually checks if the file exists — throws if not
       await s3.send(new HeadObjectCommand({
         Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
         Key:    key,
       }));
-      // File exists — generate presigned URL
-      signedUrl  = await getSignedUrl(s3, new GetObjectCommand({
+      signedUrl = await getSignedUrl(s3, new GetObjectCommand({
         Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
         Key:    key,
       }), { expiresIn: 3600 });
